@@ -15,8 +15,29 @@ def lead(pathvalue,ssvalue):
 def bound(var,a,b):
     return np.fmin(np.fmax(var,a),b)
 
+
 @nb.njit
-def bisection(f,a,b,args=(),max_iter=500,tol=1e-12):
+def bisection(f, a, b, args=(), max_iter=500, tol=1e-12):
+    i = 0
+    while i < max_iter:
+
+        m = (a + b) / 2
+        fm = f(m, *args)
+
+        if abs(fm) < tol:
+            break
+        elif f(a, *args) * fm < 0:
+            b = m
+        elif f(b, *args) * fm < 0:
+            a = m
+
+        i += 1
+
+    return m
+
+# TODO: remove
+# @nb.njit
+def bisection_no_jit(f,a,b,args=(),max_iter=500,tol=1e-12):
       
     i = 0
     while i < max_iter:

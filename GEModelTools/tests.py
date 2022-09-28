@@ -170,8 +170,8 @@ def jacs(model,s_list=None,dx=1e-4):
             print('')
 
     # e. condition numbers - full Jacobian
-    model._compute_jac(inputs='unknowns',dx=dx,do_print=True)
-    model._compute_jac(inputs='shocks',dx=dx,do_print=True)
+    model._compute_jac(inputs='unknowns',dx=dx,do_print=True, parallel=False)
+    model._compute_jac(inputs='shocks',dx=dx,do_print=True, parallel=False)
     print('')
 
     for targetname in model.targets:

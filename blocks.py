@@ -2,12 +2,15 @@ import numpy as np
 import numba as nb
 
 from GEModelTools import lag, lead, bound, bisection
+# TODO: remove
+from GEModelTools.path import bisection_no_jit
 from helper_functions import integrate_marg_util
 from helper_functions import broyden_solver_cust
 from helper_functions import obtain_J
 
 
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def NKPC_eq(x, par, r, s, Pi_plus):
     gap = s - (par.e_p - 1)/par.e_p
 
@@ -30,7 +33,8 @@ def NKPC_w_eq(x, par, s_w, Pi_w_plus):
     return NKPC_w
 
 # Question: scale inv adjustment costs?
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def adj_costs(K, K_plus, phi, delta_K):
     I = K_plus - (1 - delta_K) * K
     adj_costs = phi / 2 * (I / K - delta_K) ** 2 * K
@@ -38,7 +42,8 @@ def adj_costs(K, K_plus, phi, delta_K):
     adj_costs_deriv2 = phi / K
     return adj_costs, adj_costs_deriv1, adj_costs_deriv2
 
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def inv_eq(Q, K_lag, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
     S, S1, _ = adj_costs(K_plus, K_plus2, phi_K, delta_K)
     _, S1_plus, _ = adj_costs(K_plus2, K_plus3, phi_K, delta_K)
@@ -49,12 +54,14 @@ def inv_eq(Q, K_lag, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
     RHS = Q + (1 / (1 + r_plus)) * (I_plus2 / I_plus) ** 2 * S1_plus
     return LHS - RHS
 
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def unpack_kwargs(d):
     """ simple unpacking funtion specific to the current residual function"""
     return d['par'], d['ss'], d['Y'], d['w'], d['r']
 
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def residual(x, kwargs_dict):
     """ residual function to optimize using the broyden solver
 
@@ -99,7 +106,8 @@ def residual(x, kwargs_dict):
     # return target1, target2
     return np.hstack((target1, target2)) # np.array((target1, target2)).reshape(-1)
 
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def flat_to_K_Q(x):
     """ Flat array into seperate arrays for K and Q"""
     nx = x.shape[0]
@@ -107,8 +115,8 @@ def flat_to_K_Q(x):
     nx_half = int(nx/2)
     return x[:nx_half], x[nx_half:]
 
-
-@nb.njit
+# TODO: remove comment
+# @nb.njit
 def block_pre(par, ini, ss, path, ncols=1):
     """ evaluate transition path - before household block """
     for ncol in nb.prange(ncols):
@@ -190,19 +198,9 @@ def block_pre(par, ini, ss, path, ncols=1):
                                     tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
                                     do_print=True)
 
-        # x0 = np.array([initK, initQ]).ravel()
-        # # compute jacobian to input
-        # y0 = f(x0)
-        # jac = obtain_J(f, x0, y0)
-        #
-        # # run solver
-        # x_end = broyden_solver_cust(f, x0, jac=jac,
-        #                     tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
-        #                     do_print=False, do_print_unknowns=False, model=None,
-        #                     fixed_jac=False)
-
         # back out K and Q
         K_opt, Q_opt = flat_to_K_Q(x_end)
+        # Question: is Q also predetermined
         K[:]= np.concatenate((np.array([ss.K, ss.K]), K_opt))  # append fixed ss values for t=0,1
         Q[:] = np.concatenate((np.array([ss.Q, ss.Q]), Q_opt))
 
@@ -247,7 +245,8 @@ def block_pre(par, ini, ss, path, ncols=1):
         for t_ in range(par.T):
             t = (par.T - 1) - t_
             Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
-            Pi[t] = bisection(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
+            # TODO: change to normal one
+            Pi[t] = bisection_no_jit(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
 
         # c. Taylor rule
         for t in range(par.T):

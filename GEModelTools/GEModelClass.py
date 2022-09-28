@@ -18,8 +18,9 @@ from . import tests
 # from .simulate_hh import simulate_hh_forwards_endo, simulate_hh_forwards_exo
 from .replaced_functions import find_i_and_w_1d_1d, find_i_and_w_1d_1d_path
 from .replaced_functions import simulate_hh_forwards_endo, simulate_hh_forwards_exo
-# from .simulate_hh import simulate_hh_forwards_endo_transpose, simulate_hh_forwards_exo_transpose
 from .replaced_functions import simulate_hh_forwards_endo_transpose, simulate_hh_forwards_exo_transpose
+# TODO: delete
+from .replaced_functions import simulate_hh_forwards_endo_transpose_old, simulate_hh_forwards_exo_transpose_old
 from .simulate_hh import simulate_hh_ss, simulate_hh_path, simulate_hh_z_path
 from .broyden_solver import broyden_solver
 from .simulate import update_IRF_hh,simulate_agg,simulate_agg_hh
@@ -898,7 +899,6 @@ class GEModelClass:
         def demean(x):
             return x - x.sum()/x.size
 
-
         curly_E = {}
 
         for outputname in self.outputs_hh:
@@ -915,10 +915,32 @@ class GEModelClass:
             for outputname in self.outputs_hh:
                 temp = simulate_hh_forwards_endo_transpose(curly_E[outputname][t-1],ss.pol_indices,ss.pol_weights)
                 curly_E[outputname][t] = simulate_hh_forwards_exo_transpose(temp, ss.z_trans)
-                # simulate_hh_forwards_exo_transpose(temp,ss.z_trans,curly_E[outputname][t])
                 curly_E[outputname][t] = demean(curly_E[outputname][t])
-            
+
         if do_print: print(f'curly_E calculated in {elapsed(t0)}')
+
+
+        # TODO: delete
+        # Debugging:
+        # for the shock of z on A_hh, we know that nothing should change
+        # I.e. the expectation vector should be the same as the ss policy
+        # and (curly_E['a'][t]*curly_Dbeg1['Z'][0]).sum() = 0
+        # 1. assert that the distribution did not change along the illiquid asset grid
+        for i in range(curly_Dbeg1['Z'].shape[0]):
+            assert np.isclose(abs(curly_Dbeg1['Z'][i].sum(axis=(0,1,2))).sum(), 0, atol=1e-10), 'movement along illiquid asset grid'
+        # if the above assertion does not result in an error, the error must be a numerical error
+        # or there is an error in the expectation vectors
+        # The important part for those is that they must always have the same values for each a[i_l, :]
+        for i in range(curly_E['a'].shape[0]):
+            c_E_mean = np.empty_like(curly_E['a'][i])
+            for i_l in range(par.Nl):
+                c_E_mean[:, :, i_l, :] = curly_E['a'][i].mean(axis=-2)
+            deviation = curly_E['a'][i] - c_E_mean
+            if abs(deviation).sum() > 1e-10:
+                idx = np.where(abs(deviation) == np.max(abs(deviation)))
+                curly_E['a'][i][idx]
+        print('')
+
             
         # d. step 4: F   
         t0 = time.time()
@@ -1109,7 +1131,18 @@ class GEModelClass:
                 # i. inputs
                 x0 = x_ss.ravel().copy()
                 x0[i] += dx
-                
+
+                # store which variable is shocked
+                n_i = len(inputs)
+                if i < (x_ss.size / len(inputs)):
+                    shock_at = inputs[0] + '[' + str(i) + ']'
+                elif i < (x_ss.size / len(inputs))*2:
+                    shock_at = inputs[1] + '[' + str(i-100) + ']'
+                elif i < (x_ss.size / len(inputs))*3:
+                    shock_at = inputs[1] + '[' + str(i-200) + ']'
+                print('shock at: ' + shock_at)
+
+
                 # ii. evaluations
                 self._set_unknowns(x0,inputs)
 

@@ -379,10 +379,10 @@ def simulate_hh_forwards_endo_2d_2iw_trans(Dbeg_plus, i, w):
                     w_1_ = w[0, i_fix, i_z, i_endo1, i_endo2]
                     w_2_ = w[1, i_fix, i_z, i_endo1, i_endo2]
 
-                    D[i_fix, i_z, i_endo1, i_endo2] = ((w_1_ * w_2_) * Dbeg_plus[i_fix, i_z, i_endo1, i_endo2] + \
-                                                      + w_1_ * (1 - w_2_) * Dbeg_plus[i_fix, i_z, i_endo1, i_endo2 + 1] + \
-                                                      (1 - w_1_) * w_2_ * Dbeg_plus[i_fix, i_z, i_endo1 + 1, i_endo2] + \
-                                                      (1 - w_1_) * (1 - w_2_) * Dbeg_plus[i_fix, i_z, i_endo1 + 1, i_endo2 + 1])
+                    D[i_fix, i_z, i_endo1, i_endo2] = ((w_1_ * w_2_) * Dbeg_plus[i_fix, i_z, i_1_, i_2_] + \
+                                                      + w_1_ * (1 - w_2_) * Dbeg_plus[i_fix, i_z, i_1_, i_2_ + 1] + \
+                                                      (1 - w_1_) * w_2_ * Dbeg_plus[i_fix, i_z, i_1_ + 1, i_2_] + \
+                                                      (1 - w_1_) * (1 - w_2_) * Dbeg_plus[i_fix, i_z, i_1_ + 1, i_2_ + 1])
     return D
 
 # @nb.njit
@@ -418,4 +418,61 @@ def simulate_hh_forwards_endo_transpose(Dbeg_plus, i, w):
         raise NotImplementedError
     return D
 
+@nb.njit
+def simulate_hh_forwards_endo_transpose_old(Dbeg_plus, i, w, D):
+    """ simulate given indices and weights """
 
+    Ndim_i = i.ndim
+    Ndim_D = Dbeg_plus.ndim
+
+    if Ndim_D == 3:
+        raise NotImplementedError
+    elif Ndim_D == 4 and Ndim_i == Ndim_D:
+        raise NotImplementedError
+    elif Ndim_D == 4 and Ndim_D + 1 == Ndim_i:
+        Nfix = Dbeg_plus.shape[0]
+        Nz = Dbeg_plus.shape[1]
+        Nendo1 = Dbeg_plus.shape[2]
+        Nendo2 = Dbeg_plus.shape[3]
+        # D = np.zeros_like(Dbeg_plus)
+        for i_fix in nb.prange(Nfix):
+            for i_z in nb.prange(Nz):
+                for i_endo1 in nb.prange(Nendo1):
+                    for i_endo2 in nb.prange(Nendo2):
+                        i_1_ = i[0, i_fix, i_z, i_endo1, i_endo2]
+                        i_2_ = i[1, i_fix, i_z, i_endo1, i_endo2]
+                        w_1_ = w[0, i_fix, i_z, i_endo1, i_endo2]
+                        w_2_ = w[1, i_fix, i_z, i_endo1, i_endo2]
+
+                        D[i_fix, i_z, i_endo1, i_endo2] = ((w_1_ * w_2_) * Dbeg_plus[i_fix, i_z, i_1_, i_2_] + \
+                                                           + w_1_ * (1 - w_2_) * Dbeg_plus[
+                                                               i_fix, i_z, i_1_, i_2_ + 1] + \
+                                                           (1 - w_1_) * w_2_ * Dbeg_plus[
+                                                               i_fix, i_z, i_1_ + 1, i_2_] + \
+                                                           (1 - w_1_) * (1 - w_2_) * Dbeg_plus[
+                                                               i_fix, i_z, i_1_ + 1, i_2_ + 1])
+    else:
+        raise NotImplementedError
+
+
+@nb.njit(parallel=True)
+def simulate_hh_forwards_exo_transpose_old(Dbeg,z_trans, D):
+    """ simulate given indices and weights """
+    Nfix = Dbeg.shape[0]
+    # D = np.zeros_like(Dbeg)
+    if Dbeg.ndim < 4:  # dimensions
+        for i_fix in nb.prange(Nfix):
+            D[i_fix] = z_trans[i_fix]@Dbeg[i_fix]
+    elif Dbeg.ndim == 4:  # more dimensions than: Nfix, Nz and Na
+        Nz = Dbeg.shape[1]
+        Nl = Dbeg.shape[2]
+        Na = Dbeg.shape[3]
+        for i_fix in nb.prange(Nfix):
+            for i_l in nb.prange(Nl):
+                for i_a in nb.prange(Na):
+                    for i_z in nb.prange(Nz):
+                        D[i_fix, i_z, i_l, i_a] = 0
+                        for i_z_plus in nb.prange(Nz):
+                            D[i_fix, i_z, i_l, i_a] += z_trans[i_fix, i_z, i_z_plus] * Dbeg[i_fix, i_z_plus, i_l, i_a]
+    else:
+        raise NotImplementedError
