@@ -6,6 +6,7 @@ from GEModelTools import lag, lead, bound, bisection
 from GEModelTools.path import bisection_no_jit
 from helper_functions import integrate_marg_util
 from helper_functions import broyden_solver_cust
+from helper_functions import residual_with_linear_continuation
 from helper_functions import obtain_J
 
 
@@ -44,21 +45,25 @@ def adj_costs(K, K_plus, phi, delta_K):
 
 # TODO: remove comment
 # @nb.njit
-def inv_eq(Q, K_lag, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
+def inv_eq(Q, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
     S, S1, _ = adj_costs(K_plus, K_plus2, phi_K, delta_K)
     _, S1_plus, _ = adj_costs(K_plus2, K_plus3, phi_K, delta_K)
-    I = K - (1 - delta_K) * K_lag
-    I_plus = K_plus - (1 - delta_K) * K
-    I_plus2 = K_plus2 - (1 - delta_K) * K_plus
+    I = K_plus - (1 - delta_K) * K
+    I_plus = K_plus2 - (1 - delta_K) * K_plus
+    I_plus2 = K_plus3 - (1 - delta_K) * K_plus2
     LHS = 1 + S + I_plus / I * S1
     RHS = Q + (1 / (1 + r_plus)) * (I_plus2 / I_plus) ** 2 * S1_plus
-    return LHS - RHS
+    inv_target = LHS - RHS
+    # for numerical stability. Otherwise dx in solving the jacobian gets out of hand
+    if abs(inv_target) < 1e-8:
+        inv_target = 0
+    return inv_target
 
 # TODO: remove comment
 # @nb.njit
 def unpack_kwargs(d):
     """ simple unpacking funtion specific to the current residual function"""
-    return d['par'], d['ss'], d['Y'], d['w'], d['r']
+    return d['par'], d['ss'], d['Y'], d['w'], d['r'], d['t_predet']
 
 # TODO: remove comment
 # @nb.njit
@@ -68,26 +73,28 @@ def residual(x, kwargs_dict):
         :arg x: flattened np.array containing the unknowns"""
 
     # unpack
-    par, ss, Y, w, r = unpack_kwargs(kwargs_dict)
+    par, ss, Y, w, r, t_predet = unpack_kwargs(kwargs_dict)
 
-    K, Q = flat_to_K_Q(x)  # back out the unknows from the flattened array
-    # as K is fixed for t=0 and t=1 set these to ss value
-    K = np.concatenate((np.array([ss.K, ss.K]), K))
-    Q = np.concatenate((np.array([ss.Q, ss.Q]), Q))
-    # init
+    # get values for K and Q. For predetermined values take ss values
+    K, Q = flat_to_K_Q(x, t_predet, par.simT, ss)  # back out the unknows from the flattened array
+
+    # init target arrays
     target1 = np.empty_like(Q)
     target2 = np.empty_like(K)
 
     # labor block
-    N = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
-    s = w * N / Y / (1 - par.alpha)
-    rk = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
+    N = np.empty_like(K)
+    s = np.empty_like(K)
+    rk = np.empty_like(K)
+    N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
+    s[:] = w * N / Y / (1 - par.alpha)
+    rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 
     # calculate values for target equation
-    for t_ in range(par.T):
-        t = (par.T - 1) - t_
 
-        K_lag = K[t - 1] if t > 0 else ss.K
+    for t in range(par.T):
+
+        # K_lag = K[t - 1] if t > 0 else ss.K
         K_plus = K[t + 1] if t < par.T - 1 else ss.K
         K_plus2 = K[t + 2] if t < par.T - 2 else ss.K
         K_plus3 = K[t + 3] if t < par.T - 3 else ss.K
@@ -101,19 +108,37 @@ def residual(x, kwargs_dict):
         # calculate targets
         Q_t = (1 / (1 + r_plus)) * (rk_plus2 + (1 - par.delta_K) * Q_plus)
         target1[t] = Q[t] - Q_t
-        target2[t] = inv_eq(Q_t, K_lag, K[t], K_plus, K_plus2, K_plus3, r_plus, par.delta_K, par.phi_K)
+        # if t >= t_predet['Q'] else 0
+        # if abs(target1[t]) < 1e-8:
+        #     target1[t] = 0
+        # Question: correct that there can be no reaction to I_t/ K_t+1?
+        # Capital in t=0,1 fixed
+        target2[t] = inv_eq(Q[t], K[t], K_plus, K_plus2, K_plus3, r_plus, par.delta_K, par.phi_K)
+        # if t >= t_predet['K'] else 0
 
-    # return target1, target2
-    return np.hstack((target1, target2)) # np.array((target1, target2)).reshape(-1)
+    # target values in T-1 always statisfied as
+    return np.hstack((target2[:-1], target1[:-1]))
+    # only give back the targets which are not fixed
+    # return np.hstack((target2[t_predet['K']: ], target1[t_predet['Q']: ]))
+    # also remove last values because target will always be zero, because capital in steady state afterwards?
 
 # TODO: remove comment
 # @nb.njit
-def flat_to_K_Q(x):
+def flat_to_K_Q(x, t_predet, T, ss):
     """ Flat array into seperate arrays for K and Q"""
-    nx = x.shape[0]
-    assert nx%2 == 0.0
-    nx_half = int(nx/2)
-    return x[:nx_half], x[nx_half:]
+    # old: array had the same length
+    # nx = x.shape[0]
+    # assert nx%2 == 0.0
+    # nx_half = int(nx/2)
+    # return x[:nx_half], x[nx_half:]
+    K = x[:T - t_predet['K']]
+    K = np.concatenate((np.repeat(ss.K, t_predet['K']), K))
+    Q = x[T - t_predet['K']:]
+    if t_predet['Q'] < 0:
+        Q = np.concatenate((Q, np.repeat(ss.Q, abs(t_predet['Q']))))
+    else:
+        Q = np.concatenate((np.repeat(ss.Q, t_predet['Q']), Q))
+    return K, Q
 
 # TODO: remove comment
 # @nb.njit
@@ -180,29 +205,64 @@ def block_pre(par, ini, ss, path, ncols=1):
         initK = np.empty_like(Y)
         initK[:] = ini.K
         initQ[:] = ini.Q
-        # leave out fixed values for t = 0,1
-        initK = initK[2:]
-        initQ = initQ[2:]
+
+        # specify predetermined periods
+        t_predet = {'K': 2,
+                    'Q': 0}
+        # leave out fixed values (i.e. for K t = 0,1)
+        # otherwise jacobian would not have full rank
+        initK = initK[t_predet['K']:]
+        if t_predet['Q'] < 0:
+            initQ = initQ[:t_predet['Q']]
+        else:
+            initQ = initQ[t_predet['Q']:]
+
+        # need to adjust code for residual_with_linear_continuation if seperate bounds should be implemented
+        # also the bounds are for the targets and not K and Q directly?
+        opti_bounds = {}
 
         f_args = {'par': par,
                   'ss': ss,
                   'Y': Y,
                   'w': w,
-                  'r': r}
+                  'r': r,
+                  't_predet': t_predet}
 
         x0 = np.hstack((initK, initQ))
-        # x0 = np.array([initK, initQ]).ravel()
         y0 = residual(x0, kwargs_dict=f_args)
         jac = obtain_J(residual, x0, y0, kwargs_dict=f_args)
-        x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
-                                    tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
-                                    do_print=True)
+
+
+        # # test different calculation of jacobian, not lstsq
+        # # -> this seems to have an unwanted effect on dx
+        # # specify initial values for solver
+        # initQ = np.empty_like(Y)
+        # initK = np.empty_like(Y)
+        # initK[:] = ini.K
+        # initQ[:] = ini.Q
+        # # specify predetermined periods
+        # t_predet = {'K': 2,
+        #             'Q': 0}
+        # x0 = np.hstack((initK, initQ))
+        # y0 = residual(x0, kwargs_dict=f_args)
+        # jac2 = obtain_J(residual, x0, y0, kwargs_dict=f_args)
+        # jac3 = jac2[t_predet['K']:, t_predet['K']:]
+
+        if not opti_bounds:
+            # TODO: increase tolerance again
+            x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
+                                        tol=1e-7, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
+                                        do_print=False)
+        else:
+            constraint_residual = residual_with_linear_continuation(residual, opti_bounds, kwargs_dict=f_args)
+            x_end = broyden_solver_cust(constraint_residual, x0, kwargs_dict=f_args, jac=jac,
+                                        tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
+                                        do_print=False)
 
         # back out K and Q
-        K_opt, Q_opt = flat_to_K_Q(x_end)
-        # Question: is Q also predetermined
-        K[:]= np.concatenate((np.array([ss.K, ss.K]), K_opt))  # append fixed ss values for t=0,1
-        Q[:] = np.concatenate((np.array([ss.Q, ss.Q]), Q_opt))
+        K_opt, Q_opt = flat_to_K_Q(x_end, t_predet, par.simT, ss)
+        K[:] = K_opt
+        Q[:] = Q_opt
 
         # back out Investment
         for t in range(par.T):
@@ -384,7 +444,6 @@ def block_post(par,ini,ss,path,ncols=1):
             # C[t] = (1 + rl_lag) * L_lag + (1 + ra[t]) * A_lag + (1 - tau[t]) * w[t] * N[t] - A[t] - L[t]
 
 
-
         # a. NKPC-wage
         for t_ in range(par.T):
             t = (par.T - 1) - t_
@@ -393,11 +452,6 @@ def block_post(par,ini,ss,path,ncols=1):
 
             Pi_w_plus = Pi_w[t + 1] if t < par.T - 1 else ss.Pi_w
             Pi[t] = bisection(NKPC_w_eq, -0.2, 0.2, args=(par, s_w[t], Pi_w_plus))
-
-        # total household wealth
-        # hh_wealth[:] = A_hh + L_hh
-
-
 
         ###########
         # targets #

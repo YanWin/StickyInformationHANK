@@ -1030,6 +1030,7 @@ class GEModelClass:
             # reset
             self.path = path_original
 
+
     def _compute_jac(self,inputs=None,dx=1e-4,do_print=False,parallel=True):
         """ compute full Jacobian """
         
@@ -1132,15 +1133,21 @@ class GEModelClass:
                 x0 = x_ss.ravel().copy()
                 x0[i] += dx
 
-                # store which variable is shocked
-                n_i = len(inputs)
-                if i < (x_ss.size / len(inputs)):
-                    shock_at = inputs[0] + '[' + str(i) + ']'
-                elif i < (x_ss.size / len(inputs))*2:
-                    shock_at = inputs[1] + '[' + str(i-100) + ']'
-                elif i < (x_ss.size / len(inputs))*3:
-                    shock_at = inputs[1] + '[' + str(i-200) + ']'
-                print('shock at: ' + shock_at)
+                # # for debugging:
+                # # TODO: remove
+                # # store which variable is shocked
+                # n_i = len(inputs)
+                # if i < (x_ss.size / len(inputs)):
+                #     shock_at = inputs[0] + '[' + str(i) + ']'
+                # elif i < (x_ss.size / len(inputs))*2:
+                #     shock_at = inputs[1] + '[' + str(i-100) + ']'
+                # elif i < (x_ss.size / len(inputs))*3:
+                #     shock_at = inputs[1] + '[' + str(i-200) + ']'
+                # print('shock at: ' + shock_at)
+                # if shock_at == 'r[2]':
+                #     print('')
+                # elif shock_at == 'r[43]':
+                #     print('')
 
 
                 # ii. evaluations
