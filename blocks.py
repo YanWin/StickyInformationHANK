@@ -2,16 +2,14 @@ import numpy as np
 import numba as nb
 
 from GEModelTools import lag, lead, bound, bisection
-# TODO: remove
-from GEModelTools.path import bisection_no_jit
+# from GEModelTools.path import bisection_no_jit
 from helper_functions import integrate_marg_util
 from helper_functions import broyden_solver_cust
 from helper_functions import residual_with_linear_continuation
 from helper_functions import obtain_J
 
 
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def NKPC_eq(x, par, r, s, Pi_plus):
     gap = s - (par.e_p - 1)/par.e_p
 
@@ -34,8 +32,7 @@ def NKPC_w_eq(x, par, s_w, Pi_w_plus):
     return NKPC_w
 
 # Question: scale inv adjustment costs?
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def adj_costs(K, K_plus, phi, delta_K):
     I = K_plus - (1 - delta_K) * K
     adj_costs = phi / 2 * (I / K - delta_K) ** 2 * K
@@ -43,8 +40,7 @@ def adj_costs(K, K_plus, phi, delta_K):
     adj_costs_deriv2 = phi / K
     return adj_costs, adj_costs_deriv1, adj_costs_deriv2
 
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def inv_eq(Q, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
     S, S1, _ = adj_costs(K_plus, K_plus2, phi_K, delta_K)
     _, S1_plus, _ = adj_costs(K_plus2, K_plus3, phi_K, delta_K)
@@ -59,14 +55,12 @@ def inv_eq(Q, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
         inv_target = 0
     return inv_target
 
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def unpack_kwargs(d):
     """ simple unpacking funtion specific to the current residual function"""
     return d['par'], d['ss'], d['Y'], d['w'], d['r'], d['t_predet']
 
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def residual(x, kwargs_dict):
     """ residual function to optimize using the broyden solver
 
@@ -76,7 +70,7 @@ def residual(x, kwargs_dict):
     par, ss, Y, w, r, t_predet = unpack_kwargs(kwargs_dict)
 
     # get values for K and Q. For predetermined values take ss values
-    K, Q = flat_to_K_Q(x, t_predet, par.simT, ss)  # back out the unknows from the flattened array
+    K, Q = flat_to_K_Q(x, t_predet, par.T, ss)  # back out the unknows from the flattened array
 
     # init target arrays
     target1 = np.empty_like(Q)
@@ -122,8 +116,7 @@ def residual(x, kwargs_dict):
     # return np.hstack((target2[t_predet['K']: ], target1[t_predet['Q']: ]))
     # also remove last values because target will always be zero, because capital in steady state afterwards?
 
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def flat_to_K_Q(x, t_predet, T, ss):
     """ Flat array into seperate arrays for K and Q"""
     # old: array had the same length
@@ -140,8 +133,8 @@ def flat_to_K_Q(x, t_predet, T, ss):
         Q = np.concatenate((np.repeat(ss.Q, t_predet['Q']), Q))
     return K, Q
 
-# TODO: remove comment
-# @nb.njit
+
+@nb.njit
 def block_pre(par, ini, ss, path, ncols=1):
     """ evaluate transition path - before household block """
     for ncol in nb.prange(ncols):
@@ -217,10 +210,6 @@ def block_pre(par, ini, ss, path, ncols=1):
         else:
             initQ = initQ[t_predet['Q']:]
 
-        # need to adjust code for residual_with_linear_continuation if seperate bounds should be implemented
-        # also the bounds are for the targets and not K and Q directly?
-        opti_bounds = {}
-
         f_args = {'par': par,
                   'ss': ss,
                   'Y': Y,
@@ -233,34 +222,27 @@ def block_pre(par, ini, ss, path, ncols=1):
         jac = obtain_J(residual, x0, y0, kwargs_dict=f_args)
 
 
-        # # test different calculation of jacobian, not lstsq
-        # # -> this seems to have an unwanted effect on dx
-        # # specify initial values for solver
-        # initQ = np.empty_like(Y)
-        # initK = np.empty_like(Y)
-        # initK[:] = ini.K
-        # initQ[:] = ini.Q
-        # # specify predetermined periods
-        # t_predet = {'K': 2,
-        #             'Q': 0}
-        # x0 = np.hstack((initK, initQ))
-        # y0 = residual(x0, kwargs_dict=f_args)
-        # jac2 = obtain_J(residual, x0, y0, kwargs_dict=f_args)
-        # jac3 = jac2[t_predet['K']:, t_predet['K']:]
+        x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
+                                    tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
+                                    do_print=False)
 
-        if not opti_bounds:
-            # TODO: increase tolerance again
-            x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
-                                        tol=1e-7, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
-                                        do_print=False)
-        else:
-            constraint_residual = residual_with_linear_continuation(residual, opti_bounds, kwargs_dict=f_args)
-            x_end = broyden_solver_cust(constraint_residual, x0, kwargs_dict=f_args, jac=jac,
-                                        tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
-                                        do_print=False)
+        # TODO: remove?
+        # # could adjust code for residual_with_linear_continuation if seperate bounds should be implemented
+        # # also the bounds are for the targets and not K and Q directly?
+        # opti_bounds = {}
+        #
+        # if not opti_bounds:
+        #     x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
+        #                                 tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
+        #                                 do_print=False)
+        # else:
+        #     constraint_residual = residual_with_linear_continuation(residual, opti_bounds, kwargs_dict=f_args)
+        #     x_end = broyden_solver_cust(constraint_residual, x0, kwargs_dict=f_args, jac=jac,
+        #                                 tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
+        #                                 do_print=False)
 
         # back out K and Q
-        K_opt, Q_opt = flat_to_K_Q(x_end, t_predet, par.simT, ss)
+        K_opt, Q_opt = flat_to_K_Q(x_end, t_predet, par.T, ss)
         K[:] = K_opt
         Q[:] = Q_opt
 
@@ -305,13 +287,13 @@ def block_pre(par, ini, ss, path, ncols=1):
         for t_ in range(par.T):
             t = (par.T - 1) - t_
             Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
-            # TODO: change to normal one
-            Pi[t] = bisection_no_jit(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
+            # Pi[t] = bisection_no_jit(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
+            Pi[t] = bisection(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
 
         # c. Taylor rule
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
-            i[t] = (1 + r[t]) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
+            i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
                    * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
 
         # d. Finance
@@ -435,7 +417,6 @@ def block_post(par,ini,ss,path,ncols=1):
         L[:] = hh_wealth - A
 
 
-
         for t in range(par.T):
             # A_lag = A[t - 1] if t > 0 else ini.A
             L_lag = L[t - 1] if t > 0 else ini.L
@@ -451,28 +432,50 @@ def block_post(par,ini,ss,path,ncols=1):
             s_w[t] = par.nu * N[t] ** (1/par.frisch) / ( (1 - tau[t]) * w[t] * u_prime_e)
 
             Pi_w_plus = Pi_w[t + 1] if t < par.T - 1 else ss.Pi_w
-            Pi[t] = bisection(NKPC_w_eq, -0.2, 0.2, args=(par, s_w[t], Pi_w_plus))
+            Pi_w[t] = bisection(NKPC_w_eq, -0.2, 0.2, args=(par, s_w[t], Pi_w_plus))
 
         ###########
         # targets #
         ###########
 
-        # a. Fisher equation
+        # # (ex-post) Fisher equation
+        # for t in range(par.T):
+        #     i_lag = i[t - 1] if t > 0 else ini.i
+        #     fisher_res[t] = 1 + i_lag - (1 + r[t]) * (1 + Pi[t])
+
+        # # ex post Fisher equation (with r predetermined)
+        # for t_ in range(par.T):
+        #     t = (par.T - 1) - t_
+        #     Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
+        #     r_plus = r[t + 1] if t < par.T - 1 else ss.r
+        #     fisher_res[t] = 1 + i[t] - (1 + r_plus) * (1 + Pi_plus)
+
+        # Fisher equation (with r not predetermined)
         for t_ in range(par.T):
             t = (par.T - 1) - t_
-            Pi_w_plus = Pi_w[t + 1] if t < par.T - 1 else ss.Pi_w
-            fisher_res[t] = 1 + i[t] - (1 + r[t]) * (1 + Pi_w_plus)
+            Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
+            fisher_res[t] = 1 + i[t] - (1 + r[t]) * (1 + Pi_plus)
 
-        # b. Good market clearing
+        # # Fisher residual from their paper (I think it is wrong)
+        # for t_ in range(par.T):
+        #     t = (par.T - 1) - t_
+        #     Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
+        #     # r_plus = r[t + 1] if t < par.T - 1 else ss.r
+        #     fisher_res[t] = 1 + r[t] - (1 + i[t]) * (1 + Pi_plus)
+
+
+
+
+        # wage residual
+        for t in range(par.T):
+            w_lag = w[t - 1] if t > 0 else ini.w
+            w_res[t] = np.log(w[t] / w_lag) - (Pi_w[t] - Pi[t])
+
+        # Good market clearing
         for t in range(par.T):
             L_hh_lag = L_hh[t - 1] if t > 0 else ini.L_hh
             # C[t] = Y[t] - G[t] - I[t] - I[t] * 0 - par.xi * L_hh_lag
             clearing_Y[t] = C_hh[t] + I[t] + G[t] + psi[t] + par.xi * L_hh_lag - Y[t]
-
-        # c. wage residual
-        for t in range(par.T):
-            w_lag = w[t - 1] if t > 0 else ini.w
-            w_res[t] = np.log(w[t] / w_lag) - Pi_w[t] + Pi[t]
 
 
 

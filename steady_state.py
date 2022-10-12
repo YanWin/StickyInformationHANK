@@ -139,6 +139,7 @@ def evaluate_ss(model,do_print=False):
         ss.Dbeg = init_optimized_Dbeg(par, ss)
     model.simulate_hh_ss(do_print=do_print, Dbeg=ss.Dbeg)  # give us sim.D, ss.L_hh and ss.C_hh
 
+    ss.Pi = 0.0
     ss.Pi_w = 0.0
     v_prime_N_unscaled = ss.N ** (1 / par.frisch)
     u_prime_e = integrate_marg_util(ss.c, ss.D, par.z_grid, par.sigma)

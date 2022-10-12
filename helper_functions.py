@@ -37,12 +37,7 @@ def integrate_marg_util(c, D, z_grid, sigma):
     return int_val
 
 
-# could not get rid of
-# "TypingError: Failed in nopython mode pipeline (step: convert make_function into JIT functions)
-# Cannot capture the non-constant value associated with variable 'Y' in a function that will escape."
-# "AssertionError: Failed in nopython mode pipeline (step: inline calls to locally defined closures)"
-# TODO: remove comment
-# @nb.njit
+@nb.njit
 def broyden_solver_cust(f, x0, kwargs_dict=None, jac=None,
                         tol=1e-8, max_iter=100, backtrack_fac=0.5, max_backtrack=30,
                         do_print=False):
@@ -68,7 +63,7 @@ def broyden_solver_cust(f, x0, kwargs_dict=None, jac=None,
 
         if abs_diff < tol: return x
 
-        # # init jac not neccessary and run into numba problems
+        # # init jac not neccessary and will run into numba problems
         # if not isinstance(jac, np.ndarray):
         #     # initialize J with Newton!
         #     if jac == None and kwargs_dict == None:
@@ -80,7 +75,7 @@ def broyden_solver_cust(f, x0, kwargs_dict=None, jac=None,
         if len(x) == len(y):
             dx = np.linalg.solve(jac, -y)
         elif len(x) < len(y):
-            dx = np.linalg.lstsq(jac, -y, rcond=None)[0]
+            dx = np.linalg.lstsq(jac, -y)[0]    # not allowed to use rcond=None in Numba
         else:
             raise ValueError("Dimension of x is greater than dimension of y."
                              " Cannot solve underdetermined system.")
@@ -109,8 +104,8 @@ def broyden_solver_cust(f, x0, kwargs_dict=None, jac=None,
 
         raise ValueError('GEModelTools: No convergence of broyden solver in solving for investment')
 
-# TODO: remove comment
-# @nb.njit
+
+@nb.njit
 def obtain_J(f, x, y, kwargs_dict=None, h=1E-5):
     """Finds Jacobian f'(x) around y=f(x)"""
     nx = x.shape[0]

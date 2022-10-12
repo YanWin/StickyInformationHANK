@@ -26,7 +26,7 @@ def broyden_solver(f,x0,jac,
                     minval = np.min(model.path.__dict__[unknown][0,:])
                     meanval = np.mean(model.path.__dict__[unknown][0,:])
                     maxval = np.max(model.path.__dict__[unknown][0,:])
-                    print(f'   {unknown:15s}: {minval = :7.2f} {meanval = :7.2f} {maxval = :7.2f}')            
+                    print(f'   {unknown:15s}: {minval = :7.3f} {meanval = :7.3f} {maxval = :7.3f}')
      
             if not model is None and len(model.targets) > 1:
                 y_ = y.reshape((len(model.targets),-1))

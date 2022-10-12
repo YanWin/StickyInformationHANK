@@ -20,7 +20,7 @@ from .replaced_functions import find_i_and_w_1d_1d, find_i_and_w_1d_1d_path
 from .replaced_functions import simulate_hh_forwards_endo, simulate_hh_forwards_exo
 from .replaced_functions import simulate_hh_forwards_endo_transpose, simulate_hh_forwards_exo_transpose
 # TODO: delete
-from .replaced_functions import simulate_hh_forwards_endo_transpose_old, simulate_hh_forwards_exo_transpose_old
+# from .replaced_functions import simulate_hh_forwards_endo_transpose_old, simulate_hh_forwards_exo_transpose_old
 from .simulate_hh import simulate_hh_ss, simulate_hh_path, simulate_hh_z_path
 from .broyden_solver import broyden_solver
 from .simulate import update_IRF_hh,simulate_agg,simulate_agg_hh
@@ -939,7 +939,7 @@ class GEModelClass:
             if abs(deviation).sum() > 1e-10:
                 idx = np.where(abs(deviation) == np.max(abs(deviation)))
                 curly_E['a'][i][idx]
-        print('')
+        # print('')
 
             
         # d. step 4: F   
@@ -1134,7 +1134,6 @@ class GEModelClass:
                 x0[i] += dx
 
                 # # for debugging:
-                # # TODO: remove
                 # # store which variable is shocked
                 # n_i = len(inputs)
                 # if i < (x_ss.size / len(inputs)):
@@ -1144,10 +1143,6 @@ class GEModelClass:
                 # elif i < (x_ss.size / len(inputs))*3:
                 #     shock_at = inputs[1] + '[' + str(i-200) + ']'
                 # print('shock at: ' + shock_at)
-                # if shock_at == 'r[2]':
-                #     print('')
-                # elif shock_at == 'r[43]':
-                #     print('')
 
 
                 # ii. evaluations
@@ -1321,7 +1316,7 @@ class GEModelClass:
         self._set_ini(ini_input=ini)
 
         # b. before household block
-        with jit(self,show_exc=False) as model:
+        with jit(self,show_exc=True) as model:
             self.block_pre(model.par,model.ini,model.ss,model.path,ncols=ncols)
 
         # c. household block

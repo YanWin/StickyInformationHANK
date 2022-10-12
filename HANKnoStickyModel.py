@@ -47,7 +47,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         # c. GE
         self.shocks = ['em']  # exogenous shocks
         self.unknowns = ['r', 'w', 'Y']  # endogenous unknowns
-        self.targets = ['clearing_Y', 'fisher_res', 'w_res']  # targets = 0
+        self.targets = ['fisher_res', 'w_res', 'clearing_Y']  # targets = 0
 
         # d. all variables
         # TODO: correct spelling or delete unneccesary
@@ -84,7 +84,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # a. preferences
         par.sigma = 2.0  # CRRA coefficient
-        par.beta_mean = 0.950532  # discount factor, mean, range is [mean-width,mean+width]
+        par.beta_mean =  0.97950170 # 0.950532**(1/4)  # discount factor, mean, range is [mean-width,mean+width]
             # 0.92045 = weighted average in Auclert et al (2020) Humps, Jumps
         par.beta_delta = 0.00000  # discount factor, width, range is [mean-width,mean+width]
         # par.beta = 0.92045
@@ -101,12 +101,11 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.mu_p = 1.06
         par.e_p = par.mu_p/(par.mu_p-1)
         par.e_w = par.e_p
-        # ToDO: kappa_p formulation in terms of parameters?
         par.xi_p = 0.926    # calvo price stickiness
         par.xi_w = 0.899    # calvo wage stickiness
         par.v_p = 0        # Kimball superelasticity for prices
         par.v_w = 0        # Kimball superelasticity for wages
-        par.kappa_p = 0.1   # slope of Phillips curve
+        # par.kappa_p = 0.1   # slope of Phillips curve
         par.phi_K = 17      # elasticity of investment
 
         # d. government
@@ -119,8 +118,10 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # e. calibration
         # set targets
-        par.r_ss_target = 0.05
-        par.xi = 0.035  # Intermedation spread (p.a.) # TODO: change back to 0.065
+        r_ss_target_p_a = 0.05
+        xi_p_a = 0.065  # Intermedation spread (p.a.) # TODO: change back to 0.065
+        par.r_ss_target = (1 + r_ss_target_p_a)**(1/4) - 1
+        par.xi =  1 + par.r_ss_target - (1+ r_ss_target_p_a - xi_p_a)**(1/4)
         par.frisch = 0.5    #  Frisch elasticity
         par.alpha = np.nan   #  Capital share - calibrated to match K = K_target
         par.delta_K = 0.053 #  Depreciation of capital (p.a.)
@@ -128,9 +129,9 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.L_Y_ratio = 0.23    #  Liquid assets to GDP (p.a.)
         par.G_Y_ratio = 0.16    # Spending-to-GDP
         par.qB_Y_ratio = 0.46   # Government bonds to GDP (p.a.)
-        par.maturity = 5    #  Maturity of government debt (a.)
+        par.maturity = 5*4    #  Maturity of government debt (a.)
         par.delta_q = (par.maturity - 1) * (1 + par.r_ss_target) / par.maturity
-        par.chi = 0.001  # redistribution share for illiquid assets
+        par.chi = 0.005*4  # redistribution share for illiquid assets
         par.hh_wealth_Y_ratio = np.nan   # Total household wealth to GDP - assinged to steady state value
         par.nu = np.nan  # scaling factor in disutility from labor
         par.Theta = np.nan # productivity factor
@@ -148,6 +149,9 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.Na = 50  # number of grid points
 
         # f. shocks
+        par.jump_em = 0.00025  # initial jump
+        par.rho_em = 0.6 # AR(1) coefficient
+        par.std_em = 0  # std. of innovation
 
         # h. misc.
         par.T = 100  # length of transition path

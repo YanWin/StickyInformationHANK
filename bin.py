@@ -160,7 +160,6 @@ ss = model.ss
 par = model.par
 
 
-# CARE: as investment in t = 0 is already settled -> K[0] and K[1] are fixed
 Y = model.path.Y[0]
 w = model.path.w[0]
 r = model.path.r[0]
