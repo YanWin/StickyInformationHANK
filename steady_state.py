@@ -92,7 +92,8 @@ def evaluate_ss(model,do_print=False):
     # ss.A = ss.hh_wealth - ss.L
     ss.Q = 1.0
 
-    ss.em = 0.0
+    ss.eg = 0.0
+    # ss.em = 0.0
     ss.i = ss.r
 
     # infered targets
@@ -173,8 +174,8 @@ def find_ss(model, do_print=False):
     res = optimize.root(objective_ss, par.beta_mean, method='hybr', tol=par.tol_ss, args=(model))
 
     # final evaluation
-    print('final evaluation')
-    objective_ss(res.x, model, do_print=True)
+    if do_print: print('final evaluation')
+    objective_ss(res.x, model, do_print=do_print)
 
     if par.Nfix == 1:
         assert (1 + ss.r) * res.x[0] < 1.0, '(1+r)*beta < 1, otherwise problems might arise'

@@ -45,7 +45,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # c. GE
         # c. GE
-        self.shocks = ['em']  # exogenous shocks
+        self.shocks = ['eg']  # exogenous shocks
         self.unknowns = ['r', 'w', 'Y']  # endogenous unknowns
         self.targets = ['fisher_res', 'w_res', 'clearing_Y']  # targets = 0
 
@@ -62,7 +62,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'qB', 'w', 'rk', 'q',
             'hh_wealth',
             'clearing_Y', 'fisher_res', 'w_res', 'mf_res',
-            'em',
+            'eg',
             'Z', 's', 's_w', 'psi',
             'p_eq', 'p_share', 'p_k', 'Div_k', 'p_int', 'Div_int']    # for altenative ra acluclation
 
@@ -111,7 +111,9 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         # d. government
         par.rho_m = 0.89  # Taylor rule intertia
         par.phi_pi = 1.5  # Taylor rule coefficient
-        par.psi = 0.1     # Response of tax rate to debt (p.a.)
+        # TODO: rename par.psi to par.phi_tau
+        par.phi_tau = 0.1     # Response of tax rate to debt (p.a.)
+        par.phi_G = 0     # Tax financing of government expenditure shock
 
         # spending targets
         # bond supply targets
@@ -149,9 +151,12 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.Na = 50  # number of grid points
 
         # f. shocks
-        par.jump_em = 0.00025  # initial jump
-        par.rho_em = 0.6 # AR(1) coefficient
-        par.std_em = 0  # std. of innovation
+        par.jump_eg = 0.01  # initial jump
+        par.rho_eg = 0.6 # AR(1) coefficient
+        par.std_eg = 0.  # std. of innovation
+        # par.jump_em = 0.00025  # initial jump
+        # par.rho_em = 0.6 # AR(1) coefficient
+        # par.std_em = 0  # std. of innovation
 
         # h. misc.
         par.T = 100  # length of transition path

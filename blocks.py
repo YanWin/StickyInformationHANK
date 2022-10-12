@@ -167,7 +167,8 @@ def block_pre(par, ini, ss, path, ncols=1):
         clearing_Y = path.clearing_Y[ncol, :]
         fisher_res = path.fisher_res[ncol, :]
         w_res = path.w_res[ncol, :]
-        em = path.em[ncol, :]
+        # em = path.em[ncol, :]
+        eg = path.eg[ncol, :]
         Z = path.Z[ncol, :]
         s = path.s[ncol, :]
         rk = path.rk[ncol, :]
@@ -294,7 +295,10 @@ def block_pre(par, ini, ss, path, ncols=1):
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
             i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
-                   * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+                   * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) - 1
+            # for monetary policy shock use
+            # i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
+            #        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
 
         # d. Finance
             # Inputs: Div, r
@@ -337,15 +341,31 @@ def block_pre(par, ini, ss, path, ncols=1):
 
         # TODO: Change to fiscal policy that depends on a shock
         # e. Fiscal
-            # Inputs: q, w
+            # Inputs: q, w, eg
             # Outputs: tau, Z, G
-        G[:] = ss.G # constant government spending
+        G[:] = ss.G * (1 + eg) # constant government spending
+
         for t in range(par.T):
             B_lag = B[t-1] if t > 0 else ini.B
-            tau[t] = par.psi * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
-            B[t] = (G[t] + (1 + par.delta_q * q[t]) * B_lag - tau[t] * w[t] * N[t]) / q[t]
-            Z[:] = (1 - tau[t]) * w[t] * N[t]
+            tau_no_shock =  par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
+            B_no_shock = (ss.G + (1 + par.delta_q * q[t]) * B_lag - tau_no_shock * w[t] * N[t]) / q[t]
+            delta_tau = ((1-par.phi_G) * ss.G * eg[t]) / w[t] / N[t]
+            delta_B = par.phi_G * ss.G * eg[t] / q[t]
+            tau[t] = delta_tau + tau_no_shock
+            B[t] = delta_B + B_no_shock
+            # value of government debt
             qB[t] = q[t] * B[t]
+            # labor income without idiosyncratic shocks
+            Z[:] = (1 - tau[t]) * w[t] * N[t]
+
+        # without fiscal schock:
+        # G[:] = ss.G
+        # for t in range(par.T):
+        #     B_lag = B[t-1] if t > 0 else ini.B
+        #     tau[t] = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
+        #     B[t] = (G[t] + (1 + par.delta_q * q[t]) * B_lag - tau[t] * w[t] * N[t]) / q[t]
+        #     Z[:] = (1 - tau[t]) * w[t] * N[t]
+        #     qB[t] = q[t] * B[t]
 
         hh_wealth[:] = p_eq + qB
 
@@ -384,7 +404,8 @@ def block_post(par,ini,ss,path,ncols=1):
         clearing_Y = path.clearing_Y[ncol, :]
         fisher_res = path.fisher_res[ncol, :]
         w_res = path.w_res[ncol, :]
-        em = path.em[ncol, :]
+        # em = path.em[ncol, :]
+        eg = path.eg[ncol, :]
         Z = path.Z[ncol, :]
         s = path.s[ncol, :]
         rk = path.rk[ncol, :]
