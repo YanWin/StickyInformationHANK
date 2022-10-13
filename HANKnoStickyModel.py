@@ -43,9 +43,9 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         self.outputs_hh = ['c', 'l', 'a']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
+
         # c. GE
-        # c. GE
-        self.shocks = ['eg']  # exogenous shocks
+        self.shocks = ['eg', 'em']  # exogenous shocks
         self.unknowns = ['r', 'w', 'Y']  # endogenous unknowns
         self.targets = ['fisher_res', 'w_res', 'clearing_Y']  # targets = 0
 
@@ -62,7 +62,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'qB', 'w', 'rk', 'q',
             'hh_wealth',
             'clearing_Y', 'fisher_res', 'w_res', 'mf_res',
-            'eg',
+            'eg', 'em',
             'Z', 's', 's_w', 'psi',
             'p_eq', 'p_share', 'p_k', 'Div_k', 'p_int', 'Div_int']    # for altenative ra acluclation
 
@@ -106,7 +106,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.v_p = 0        # Kimball superelasticity for prices
         par.v_w = 0        # Kimball superelasticity for wages
         # par.kappa_p = 0.1   # slope of Phillips curve
-        par.phi_K = 17      # elasticity of investment
+        par.phi_K = 10  # 17      # elasticity of investment
 
         # d. government
         par.rho_m = 0.89  # Taylor rule intertia
@@ -151,12 +151,12 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.Na = 50  # number of grid points
 
         # f. shocks
-        par.jump_eg = 0.01  # initial jump
+        par.jump_eg = 0.01 # 0.01  # initial jump
         par.rho_eg = 0.6 # AR(1) coefficient
         par.std_eg = 0.  # std. of innovation
-        # par.jump_em = 0.00025  # initial jump
-        # par.rho_em = 0.6 # AR(1) coefficient
-        # par.std_em = 0  # std. of innovation
+        par.jump_em = 0.  # initial jump
+        par.rho_em = 0.6 # AR(1) coefficient
+        par.std_em = 0.  # std. of innovation
 
         # h. misc.
         par.T = 100  # length of transition path

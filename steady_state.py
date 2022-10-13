@@ -93,7 +93,7 @@ def evaluate_ss(model,do_print=False):
     ss.Q = 1.0
 
     ss.eg = 0.0
-    # ss.em = 0.0
+    ss.em = 0.0
     ss.i = ss.r
 
     # infered targets

@@ -110,11 +110,10 @@ def residual(x, kwargs_dict):
         target2[t] = inv_eq(Q[t], K[t], K_plus, K_plus2, K_plus3, r_plus, par.delta_K, par.phi_K)
         # if t >= t_predet['K'] else 0
 
-    # target values in T-1 always statisfied as
+    # target values in T-1 always statisfied
     return np.hstack((target2[:-1], target1[:-1]))
-    # only give back the targets which are not fixed
-    # return np.hstack((target2[t_predet['K']: ], target1[t_predet['Q']: ]))
-    # also remove last values because target will always be zero, because capital in steady state afterwards?
+
+
 
 @nb.njit
 def flat_to_K_Q(x, t_predet, T, ss):
@@ -167,7 +166,7 @@ def block_pre(par, ini, ss, path, ncols=1):
         clearing_Y = path.clearing_Y[ncol, :]
         fisher_res = path.fisher_res[ncol, :]
         w_res = path.w_res[ncol, :]
-        # em = path.em[ncol, :]
+        em = path.em[ncol, :]
         eg = path.eg[ncol, :]
         Z = path.Z[ncol, :]
         s = path.s[ncol, :]
@@ -190,7 +189,9 @@ def block_pre(par, ini, ss, path, ncols=1):
         # implied paths #
         #################
 
-        # a. Production
+        ###
+        # a. Production Block
+        ###
             # inputs: r,w,Y
             # outputs: D,N,I,s
 
@@ -274,15 +275,9 @@ def block_pre(par, ini, ss, path, ncols=1):
         # rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 
 
-        # Dividends
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
-            K_plus = K[t + 1] if t < par.T - 1 else ss.K
-            S, _, _ = adj_costs(K[t], K_plus, par.phi_K, par.delta_K)
-            psi[t] = I[t] * S
-            Div[t] = Y[t] - w[t] * N[t] - I[t] - psi[t]
-
-        # b. solve NKPC
+        ###
+        # b. NKPC prices block
+        ###
             # input: s
             # output: Pi
         for t_ in range(par.T):
@@ -291,19 +286,34 @@ def block_pre(par, ini, ss, path, ncols=1):
             # Pi[t] = bisection_no_jit(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
             Pi[t] = bisection(NKPC_eq, -0.2, 0.2, args=(par, r[t], s[t], Pi_plus))
 
-        # c. Taylor rule
+        ###
+        # c. Taylor rule block
+        ###
+            # inputs: Pi
+            # outputs: i
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
-            i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
-                   * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) - 1
-            # for monetary policy shock use
+            # without mp shock
             # i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
-            #        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+            #        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) - 1
+            # for monetary policy shock use
+            i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
+                   * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
 
-        # d. Finance
+        ###
+        # d. Finance block
+        ###
             # Inputs: Div, r
             # outputs: q, rl, ra
         rl[:] =  r - par.xi
+
+        # Dividends
+        for t_ in range(par.T):
+            t = (par.T - 1) - t_
+            K_plus = K[t + 1] if t < par.T - 1 else ss.K
+            S, _, _ = adj_costs(K[t], K_plus, par.phi_K, par.delta_K)
+            psi[t] = I[t] * S
+            Div[t] = Y[t] - w[t] * N[t] - I[t] - psi[t]
 
         for t_ in range(par.T):
             t = (par.T - 1) - t_
@@ -339,8 +349,9 @@ def block_pre(par, ini, ss, path, ncols=1):
                  + (1 - p_share[t]) * (1 + par.delta_q * q[t]) / q_lag - 1
 
 
-        # TODO: Change to fiscal policy that depends on a shock
-        # e. Fiscal
+        ###
+        # e. Fiscal block
+        ###
             # Inputs: q, w, eg
             # Outputs: tau, Z, G
         G[:] = ss.G * (1 + eg) # constant government spending
@@ -404,7 +415,7 @@ def block_post(par,ini,ss,path,ncols=1):
         clearing_Y = path.clearing_Y[ncol, :]
         fisher_res = path.fisher_res[ncol, :]
         w_res = path.w_res[ncol, :]
-        # em = path.em[ncol, :]
+        em = path.em[ncol, :]
         eg = path.eg[ncol, :]
         Z = path.Z[ncol, :]
         s = path.s[ncol, :]
@@ -445,8 +456,11 @@ def block_post(par,ini,ss,path,ncols=1):
             C[t] = Y[t] - G[t] - I[t] - psi[t] - par.xi * L_lag
             # C[t] = (1 + rl_lag) * L_lag + (1 + ra[t]) * A_lag + (1 - tau[t]) * w[t] * N[t] - A[t] - L[t]
 
-
-        # a. NKPC-wage
+        ###
+        # a. NKPC-wage block
+        ###
+            # inputs C_hh, w, tau, pi
+            # outputs: Pi_w
         for t_ in range(par.T):
             t = (par.T - 1) - t_
             u_prime_e = integrate_marg_util(c[t], D[t], par.z_grid, par.sigma)
@@ -459,23 +473,16 @@ def block_post(par,ini,ss,path,ncols=1):
         # targets #
         ###########
 
-        # # (ex-post) Fisher equation
-        # for t in range(par.T):
-        #     i_lag = i[t - 1] if t > 0 else ini.i
-        #     fisher_res[t] = 1 + i_lag - (1 + r[t]) * (1 + Pi[t])
-
-        # # ex post Fisher equation (with r predetermined)
-        # for t_ in range(par.T):
-        #     t = (par.T - 1) - t_
-        #     Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
-        #     r_plus = r[t + 1] if t < par.T - 1 else ss.r
-        #     fisher_res[t] = 1 + i[t] - (1 + r_plus) * (1 + Pi_plus)
-
-        # Fisher equation (with r not predetermined)
+        # Fisher equation (with r not predetermined - as they describe it: ex-ante real interest rate?)
         for t_ in range(par.T):
             t = (par.T - 1) - t_
             Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
             fisher_res[t] = 1 + i[t] - (1 + r[t]) * (1 + Pi_plus)
+
+        # # (ex-post) Fisher equation
+        # for t in range(par.T):
+        #     i_lag = i[t - 1] if t > 0 else ini.i
+        #     fisher_res[t] = 1 + i_lag - (1 + r[t]) * (1 + Pi[t])
 
         # # Fisher residual from their paper (I think it is wrong)
         # for t_ in range(par.T):
@@ -483,8 +490,6 @@ def block_post(par,ini,ss,path,ncols=1):
         #     Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
         #     # r_plus = r[t + 1] if t < par.T - 1 else ss.r
         #     fisher_res[t] = 1 + r[t] - (1 + i[t]) * (1 + Pi_plus)
-
-
 
 
         # wage residual
