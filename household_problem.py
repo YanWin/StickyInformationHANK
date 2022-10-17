@@ -7,10 +7,11 @@ from consav.linear_interp import interp_1d_vec
 
 
 @nb.njit
-def solve_hh_backwards(par, z_trans, Z, ra, rl, vbeg_l_a_plus,vbeg_l_a, l, c, a):
+def solve_hh_backwards(par, z_trans, Z, ra, rl, vbeg_l_a_plus,vbeg_l_a, l, c, a, uce):
     """ solve backwards with vbeg_a from previous iteration (here vbeg_a_plus) """
 
-    A_target = (par.hh_wealth_Y_ratio-par.L_Y_ratio)    # TODO: add *ss.Y
+    A_target = par.A_target # (par.hh_wealth_Y_ratio-par.L_Y_ratio)
+
     r_ss = par.r_ss_target
 
     # i. prepare
@@ -45,7 +46,7 @@ def solve_hh_backwards(par, z_trans, Z, ra, rl, vbeg_l_a_plus,vbeg_l_a, l, c, a)
                 c[i_fix, i_z, :, i_a] = m - l[i_fix, i_z, :, i_a]
                 a[i_fix, i_z, :, i_a] = (1 + ra) * a_i - da(a_i)    # next periods illiquid assets
 
-                # uce[i_fix, i_z, :, i_a] = e * c[i_fix, i_z, :, i_a] ** (-par.sigma) # productivity weighted marg. util.
+                uce[i_fix, i_z, :, i_a] = e * c[i_fix, i_z, :, i_a] ** (-par.sigma) # productivity weighted marg. util.
 
         # b. expectation step
         v_l_a = (1 + rl) * c[i_fix] ** (-par.sigma)

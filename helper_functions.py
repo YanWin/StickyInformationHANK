@@ -21,18 +21,18 @@ def integrate_marg_util(c, D, z_grid, sigma):
     assert c.shape == D.shape, 'c and D do not have the same dimensions'
 
     Nfix = c.shape[0]
-    Ne = c.shape[1]
+    Nz = c.shape[1]
     Nl = c.shape[2]
     Na = c.shape[3]
 
     int_val = 0.0
 
     for i_fix in nb.prange(Nfix):
-        for i_e in nb.prange(Ne):
-            e_i = z_grid[i_e]
+        for i_z in nb.prange(Nz):
+            z_i = z_grid[i_z]
             for i_a in nb.prange(Na):
                 for i_l in nb.prange(Nl):
-                    int_val = int_val + e_i * c[i_fix, i_e, i_l, i_a]**(-sigma) * D[i_fix, i_e, i_l, i_a]
+                    int_val = int_val + z_i * c[i_fix, i_z, i_l, i_a]**(-sigma) * D[i_fix, i_z, i_l, i_a]
 
     return int_val
 

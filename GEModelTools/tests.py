@@ -127,8 +127,10 @@ def jacs(model,s_list=None,dx=1e-4):
         jac_hh_direct = deepcopy(model.jac_hh)
 
         # b. fake news
-        print(f'\nfake news method:')
         model._compute_jac_hh(dx=dx,do_print=True,do_direct=False)
+        # TODO: check if working (change 15.10)
+        if hasattr(par, 'inattention'):
+            model.jac_hh = model._compute_sticky_jacs_hh(model.jac_hh)
 
         # c. compare
         fig = plt.figure(figsize=(6*2,len(model.outputs_hh)*len(model.inputs_hh_all)*4),dpi=100)

@@ -13,17 +13,6 @@ import household_problem
 import blocks
 import helper_functions
 
-# # Attempt to overwrite functions from GEModelTools package with functions specified here.
-# # This works for functions called directly, but not if a function calls another function in another file.
-# # E.g. simulate_hh_path() calls
-# sys.modules['GEModelTools'].GEModelClass._find_i_and_w_dict = helper_functions._find_i_and_w_dict
-# sys.modules['GEModelTools'].GEModelClass._find_i_and_w_path = helper_functions._find_i_and_w_path
-#
-# sys.modules['GEModelTools'].simulate_hh.simulate_hh_forwards_exo = helper_functions.simulate_hh_forwards_exo
-# sys.modules['GEModelTools'].simulate_hh.simulate_hh_forwards_endo = helper_functions.simulate_hh_forwards_endo
-# sys.modules['GEModelTools'].GEModelClass.simulate_hh_forwards_exo = helper_functions.simulate_hh_forwards_exo
-# sys.modules['GEModelTools'].GEModelClass.simulate_hh_forwards_endo = helper_functions.simulate_hh_forwards_endo
-
 
 class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
@@ -35,12 +24,10 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # b. household
         self.grids_hh = ['l', 'a']  # grids
-        # change 30.08 added 'a' to pols_hh
         self.pols_hh = ['l', 'a']  # policy functions
         self.inputs_hh = ['Z', 'ra', 'rl']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
-        # change 30.08 added 'a' to outputs_hh
-        self.outputs_hh = ['c', 'l', 'a']  # outputs
+        self.outputs_hh = ['c', 'l', 'a', 'uce']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
 
@@ -50,15 +37,13 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         self.targets = ['fisher_res', 'w_res', 'clearing_Y']  # targets = 0
 
         # d. all variables
-        # TODO: correct spelling or delete unneccesary
-            # make Pi in all documents wih small letters
-            # delete A_hh
+        # TODO: delete the unneccesary ones to speed up the Jacobian calculation
         self.varlist = [
             'r', 'ra','rl', 'i',
             'Pi', 'Pi_w',
             'G', 'tau', 'B',
             'Y', 'N', 'I', 'K', 'Div', 'Q',
-            'C', 'A', 'L', # 'A_hh',
+            'C', 'A', 'L',
             'qB', 'w', 'rk', 'q',
             'hh_wealth',
             'clearing_Y', 'fisher_res', 'w_res', 'mf_res',
@@ -106,12 +91,11 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.v_p = 0        # Kimball superelasticity for prices
         par.v_w = 0        # Kimball superelasticity for wages
         # par.kappa_p = 0.1   # slope of Phillips curve
-        par.phi_K = 10  # 17      # elasticity of investment
+        par.phi_K = 17 # 17      # elasticity of investment
 
         # d. government
         par.rho_m = 0.89  # Taylor rule intertia
         par.phi_pi = 1.5  # Taylor rule coefficient
-        # TODO: rename par.psi to par.phi_tau
         par.phi_tau = 0.1     # Response of tax rate to debt (p.a.)
         par.phi_G = 0     # Tax financing of government expenditure shock
 
@@ -121,7 +105,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         # e. calibration
         # set targets
         r_ss_target_p_a = 0.05
-        xi_p_a = 0.065  # Intermedation spread (p.a.) # TODO: change back to 0.065
+        xi_p_a = 0.065  # Intermedation spread (p.a.)
         par.r_ss_target = (1 + r_ss_target_p_a)**(1/4) - 1
         par.xi =  1 + par.r_ss_target - (1+ r_ss_target_p_a - xi_p_a)**(1/4)
         par.frisch = 0.5    #  Frisch elasticity
@@ -137,6 +121,10 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.hh_wealth_Y_ratio = np.nan   # Total household wealth to GDP - assinged to steady state value
         par.nu = np.nan  # scaling factor in disutility from labor
         par.Theta = np.nan # productivity factor
+        par.A_target = np.nan  # illiquid asset target (needs to be adapted in the case of different groups)
+
+        # sticky information parameter
+        par.inattention = 0. # 0.935
 
 
         # e. grids
@@ -199,7 +187,6 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             self.path.pol_weights = np.zeros(path_pol_shape)
             self.sim.pol_indices = np.zeros(sim_pol_shape, dtype=np.int_)
             self.sim.pol_weights = np.zeros(sim_pol_shape)
-
 
 
 

@@ -10,10 +10,14 @@ plt.rcParams.update({'font.size':12})
 
 def show_IRFs(models,labels,varnames,
             abs_diff=None,lvl_value=None,facs=None,pows=None,
-            do_shocks=True,do_targets=True,do_linear=False,
+            do_shocks=True,do_targets=True,
+            do_linear=False, do_non_linear=True,
             ncols=4,T_max=None, filename=None):
-    
-    assert len(models) == 1 or not do_linear, 'comparision with linear only availible with one model'
+
+    assert do_linear or do_non_linear, 'plot at least one of the linear or non-linear IRFs'
+    assert len(models) == 1 or not (do_linear and do_non_linear), 'comparison of linear and non-linear only available' \
+                                                            ' with one model'
+    # assert len(models) == 1 or not do_linear, 'comparision with linear only availible with one model'
 
     abs_diff = [] if abs_diff is None else abs_diff
     lvl_value = [] if lvl_value is None else lvl_value
@@ -57,7 +61,14 @@ def show_IRFs(models,labels,varnames,
             for label,model_ in zip(labels,models):
             
                 pathvalue = model_.path.__dict__[varname][0,:]
-                IRFvalue = model_.IRF[varname]               
+                IRFvalue = model_.IRF[varname]
+
+                if not do_non_linear:
+                    label_linear = label
+                    ls_linear = '-'
+                else:
+                    label_linear = 'linear'
+                    ls_linear = '--'
 
                 if not np.isnan(getattr(model_.ss,varname)):
 
@@ -74,10 +85,11 @@ def show_IRFs(models,labels,varnames,
                             ssvalue = facs[varname]*((1+ssvalue)**pows[varname]-1)
                             pathvalue = facs[varname]*((1+pathvalue)**pows[varname]-1)
                             IRFvalue = facs[varname]*((1+IRFvalue)**pows[varname]-1)
-                   
-                        ax.plot(np.arange(T_max),pathvalue[:T_max]-ssvalue,label=label)
+
+                        if do_non_linear:
+                            ax.plot(np.arange(T_max),pathvalue[:T_max]-ssvalue,label=label)
                         if do_linear:
-                            ax.plot(np.arange(T_max),IRFvalue[:T_max]-ssvalue,ls='--',label='linear')
+                            ax.plot(np.arange(T_max),IRFvalue[:T_max]-ssvalue,ls=ls_linear,label=label_linear)
 
                         if varname in facs:
                             ax.set_ylabel(fr'{facs[varname]:.0f} x abs. diff. to of s.s.')
@@ -95,9 +107,10 @@ def show_IRFs(models,labels,varnames,
                             pathvalue = facs[varname]*((1+pathvalue)**pows[varname]-1)
                             IRFvalue = facs[varname]*((1+IRFvalue)**pows[varname]-1)
 
-                        ax.plot(np.arange(T_max),pathvalue[:T_max],label=label)
+                        if do_non_linear:
+                            ax.plot(np.arange(T_max),pathvalue[:T_max],label=label)
                         if do_linear:
-                            ax.plot(np.arange(T_max),IRFvalue[:T_max],ls='--',label='linear')
+                            ax.plot(np.arange(T_max),IRFvalue[:T_max],ls=ls_linear,label=label_linear)
 
                         if not np.isclose(facs[varname],1.0):
                             ax.set_ylabel(fr'{facs[varname]:.0f} x level')
@@ -106,19 +119,21 @@ def show_IRFs(models,labels,varnames,
 
                     else:
 
-                        ax.plot(np.arange(T_max),100*(pathvalue[:T_max]/ssvalue-1),label=label)
+                        if do_non_linear:
+                            ax.plot(np.arange(T_max),100*(pathvalue[:T_max]/ssvalue-1),label=label)
                         if do_linear:
-                            ax.plot(np.arange(T_max),100*(IRFvalue[:T_max]/ssvalue-1),ls='--',label='linear')
+                            ax.plot(np.arange(T_max),100*(IRFvalue[:T_max]/ssvalue-1),ls=ls_linear,label=label_linear)
 
                         ax.set_ylabel('% diff. to s.s.')
 
                 else:
-
-                    ax.plot(np.arange(T_max),pathvalue[:T_max],label=label)
+                    if do_non_linear:
+                        ax.plot(np.arange(T_max),pathvalue[:T_max],label=label)
                     if do_linear:
-                        ax.plot(np.arange(T_max),IRFvalue[:T_max],ls='--',label='linear')
-            
-            if (len(labels) > 1 or do_linear) and i == 0: ax.legend(frameon=True)
+                        ax.plot(np.arange(T_max),IRFvalue[:T_max],ls=ls_linear,label=label_linear)
+
+            if (len(labels) > 1 or (do_linear and do_non_linear)) and i == 0: ax.legend(frameon=True)
+            # if (len(labels) > 1 or do_linear) and i == 0: ax.legend(frameon=True)
             
         fig.tight_layout(pad=3.0)
         plt.show()
@@ -126,3 +141,5 @@ def show_IRFs(models,labels,varnames,
 
         # save
         if not filename is None: fig.savefig(filename)
+
+

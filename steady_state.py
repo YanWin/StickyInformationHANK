@@ -122,8 +122,9 @@ def evaluate_ss(model,do_print=False):
     ss.hh_wealth = ss.p_eq + ss.qB
     par.hh_wealth_Y_ratio = ss.hh_wealth # for easier access in backawrds solving
     ss.A = ss.hh_wealth - ss.L
+    par.A_target = par.hh_wealth_Y_ratio-par.L_Y_ratio
     # ss.p_eq = ss.hh_wealth-ss.qB # old
-    ss.p_share = ss.p_eq/ss.A
+    ss.p_share = ss.p_int/ss.A   # TODO: chek if correct, otherwise change back to p_eq
     # ss.ra2 = ss.p_share*(ss.Div+ss.p_eq)/ss.p_eq+(1-ss.p_share)*(1+ss.rl)-1
 
     ss.C = ss.Y - ss.G - ss.I - par.xi * ss.L

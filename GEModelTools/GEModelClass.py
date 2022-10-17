@@ -1171,15 +1171,66 @@ class GEModelClass:
             
     def compute_jacs(self,dx=1e-4,skip_hh=False,inputs_hh_all=None,skip_shocks=False,do_print=False,parallel=True,do_direct=False):
         """ compute all Jacobians """
-        
+
         if not skip_hh and len(self.outputs_hh) > 0:
             if do_print: print('household Jacobians:')
             self._compute_jac_hh(inputs_hh_all=inputs_hh_all,dx=dx,do_direct=do_direct,do_print=do_print)
+
+            # compute sticky information jacs
+            if hasattr(par, 'inattention'):
+                # TODO: add assert that it only works for fake news method
+                self.jac_hh = self._compute_sticky_jacs_hh(self.jac_hh)
+
             if do_print: print('')
+
 
         if do_print: print('full Jacobians:')
         self._compute_jac(inputs='unknowns',dx=dx,parallel=parallel,do_print=do_print)
         if not skip_shocks: self._compute_jac(inputs='shocks',dx=dx,parallel=parallel,do_print=do_print)
+
+    def _compute_sticky_jacs_hh(self, jac):
+        """ calculate sticky information household Jacobians"""
+
+        par = self.par
+
+        jac_sticky = jac.copy()
+
+        for key in jac.keys():
+            # init
+            jac_sticky_temp = np.zeros_like(jac[key])
+            # fill
+            T = jac[key].shape[0]
+            for t in range(T):
+                for s in range(T):
+                    if s == 0:
+                        jac_sticky_temp[t, s] = jac[key][t, s]
+                    elif t == 0:
+                        jac_sticky_temp[t, s] = (1 - par.inattention) * jac[key][t, s]
+                    else:
+                        jac_sticky_temp[t, s] = par.inattention * jac_sticky_temp[t - 1, s - 1] \
+                                                + (1 - par.inattention) * jac[key][t, s]
+            # input
+            jac_sticky[key] = jac_sticky_temp
+        return jac_sticky
+
+
+    # def compute_sticky_jacs(self,do_print=False):
+    #     """ compute sticky information Jacobians"""
+    #
+    #     t0 = time.time()
+    #
+    #     # sticky information Jacobians only relevant for the household jacobians
+    #     if do_print: print('household Jacobians:')
+    #     self.jac_sticky_hh = self._compute_sticky_jacs_hh(self.jac_hh)
+    #     if do_print: print('')
+    #
+    #     # sticky household jacobians change
+    #     # H_U
+    #     # H_Z
+    #     # G_U
+    #
+    #     if do_print: print(f'sticky information Jacobians calculated in {elapsed(t0)}')
+
 
     ####################################
     # 5. find transition path and IRFs #
@@ -1459,6 +1510,7 @@ class GEModelClass:
     def compare_IRFs(self,models,labels,varnames,
         abs_diff=None,lvl_value=None,facs=None,pows=None,
         do_shocks=True,do_targets=True,
+        do_linear=False, do_non_linear=True,
         T_max=None,ncols=4,filename=None):
         """ compare IRFs across models """
 
@@ -1478,6 +1530,7 @@ class GEModelClass:
         show_IRFs(models,labels,varnames,
             abs_diff=abs_diff,lvl_value=lvl_value,facs=facs,pows=pows,
             do_shocks=do_shocks,do_targets=do_targets,
+            do_linear=do_linear, do_non_linear=do_non_linear,
             T_max=T_max,ncols=ncols,filename=filename)
   
     ###############

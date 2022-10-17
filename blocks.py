@@ -24,10 +24,10 @@ def NKPC_eq(x, par, r, s, Pi_plus):
 def NKPC_w_eq(x, par, s_w, Pi_w_plus):
     gap = s_w - (par.e_w - 1)/par.e_w
 
-    kappa = (1-par.xi_w) * (1-par.xi_w*par.beta_mean) / par.xi_p \
+    kappa = (1-par.xi_w) * (1-par.xi_w*par.beta_mean) / par.xi_w \
             * par.e_w / (par.v_w + par.e_w - 1)
 
-    NKPC_w = kappa * gap - par.beta_mean*Pi_w_plus
+    NKPC_w = x - kappa * gap - par.beta_mean*Pi_w_plus
 
     return NKPC_w
 
@@ -102,16 +102,11 @@ def residual(x, kwargs_dict):
         # calculate targets
         Q_t = (1 / (1 + r_plus)) * (rk_plus2 + (1 - par.delta_K) * Q_plus)
         target1[t] = Q[t] - Q_t
-        # if t >= t_predet['Q'] else 0
-        # if abs(target1[t]) < 1e-8:
-        #     target1[t] = 0
-        # Question: correct that there can be no reaction to I_t/ K_t+1?
         # Capital in t=0,1 fixed
         target2[t] = inv_eq(Q[t], K[t], K_plus, K_plus2, K_plus3, r_plus, par.delta_K, par.phi_K)
-        # if t >= t_predet['K'] else 0
 
     # target values in T-1 always statisfied
-    return np.hstack((target2[:-1], target1[:-1]))
+    return np.hstack((target2[:-1], target1[t_predet['Q']:-1]))
 
 
 
@@ -131,6 +126,11 @@ def flat_to_K_Q(x, t_predet, T, ss):
     else:
         Q = np.concatenate((np.repeat(ss.Q, t_predet['Q']), Q))
     return K, Q
+
+# @nb.njit
+# def dA(A, ra, par, ss):
+#     return ss.r / (1 + ss.r) * (1 + ra) * A + par.chi * (
+#             (1 + ra) * A - (1 + ss.r) * par.A_target)
 
 
 @nb.njit
@@ -158,6 +158,7 @@ def block_pre(par, ini, ss, path, ncols=1):
         C_hh = path.C_hh[ncol, :]
         L_hh = path.L_hh[ncol, :]
         A_hh = path.A_hh[ncol, :]
+        UCE_hh = path.UCE_hh[ncol, :]
         # UCE_hh = path.UCE_hh[ncol, :]
         qB = path.qB[ncol, :]
         w = path.w[ncol, :]
@@ -207,10 +208,7 @@ def block_pre(par, ini, ss, path, ncols=1):
         # leave out fixed values (i.e. for K t = 0,1)
         # otherwise jacobian would not have full rank
         initK = initK[t_predet['K']:]
-        if t_predet['Q'] < 0:
-            initQ = initQ[:t_predet['Q']]
-        else:
-            initQ = initQ[t_predet['Q']:]
+        initQ = initQ[t_predet['Q']:]
 
         f_args = {'par': par,
                   'ss': ss,
@@ -293,30 +291,33 @@ def block_pre(par, ini, ss, path, ncols=1):
             # outputs: i
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
-            # without mp shock
-            # i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
-            #        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) - 1
             # for monetary policy shock use
-            i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
-                   * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+            # i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
+            #        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+            # simple taylor rule
+            i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
 
         ###
         # d. Finance block
         ###
             # Inputs: Div, r
             # outputs: q, rl, ra
-        rl[:] =  r - par.xi
+
+        for t in range(par.T):
+            # rl
+            r_lag = r[t - 1] if t > 0 else ini.r
+            rl[t] =  r_lag - par.xi
 
         # Dividends
         for t_ in range(par.T):
             t = (par.T - 1) - t_
+
+            # Div
             K_plus = K[t + 1] if t < par.T - 1 else ss.K
             S, _, _ = adj_costs(K[t], K_plus, par.phi_K, par.delta_K)
             psi[t] = I[t] * S
             Div[t] = Y[t] - w[t] * N[t] - I[t] - psi[t]
 
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
             # q
             q_plus = q[t + 1] if t < par.T - 1 else ss.q
             q[t] = (1 + par.delta_q * q_plus) / (1 + r[t])
@@ -326,9 +327,9 @@ def block_pre(par, ini, ss, path, ncols=1):
             Div_plus = Div[t + 1] if t < par.T - 1 else ss.Div
             p_eq[t] = (Div_plus + p_eq_plus) / (1 + r[t])
 
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
+            # Div_k
             Div_k[t] = rk[t] * K[t] - I[t] - psi[t]
+            # Div_int
             Div_int[t] = Div[t] - Div_k[t]
 
             Div_k_plus = Div_k[t + 1] if t < par.T - 1 else ss.Div_k
@@ -340,13 +341,51 @@ def block_pre(par, ini, ss, path, ncols=1):
             p_int[t] = (1 / (1 + r[t])) * (p_int_plus + Div_int_plus)
 
 
+        # for t in range(par.T):
+        #     # ra
+        #     p_eq_lag = p_eq[t - 1] if t > 0 else ini.p_eq
+        #     q_lag = q[t - 1] if t > 0 else ini.q
+        #     p_share[t] = p_eq_lag / (par.hh_wealth_Y_ratio - par.L_Y_ratio)
+        #     ra[t] = p_share[t] * (Div[t] + p_eq[t]) / p_eq_lag \
+        #          + (1 - p_share[t]) * (1 + par.delta_q * q[t]) / q_lag - 1
+
+        dA = lambda A, ra : par.chi * ((1 + ra) * A - (1 + ss.r) * par.A_target)
+
         for t in range(par.T):
-            # ra
-            p_eq_lag = p_eq[t - 1] if t > 0 else ini.p_eq
+            p_int_lag = p_int[t - 1] if t > 0 else ini.p_int
             q_lag = q[t - 1] if t > 0 else ini.q
-            p_share[t] = p_eq_lag / (par.hh_wealth_Y_ratio - par.L_Y_ratio)
-            ra[t] = p_share[t] * (Div[t] + p_eq[t]) / p_eq_lag \
-                 + (1 - p_share[t]) * (1 + par.delta_q * q[t]) / q_lag - 1
+            A_lag = A[t - 1] if t > 0 else par.A_target
+            p_share_lag = p_share[t - 1] if t > 0 else ini.p_share
+
+            ra[t] = p_share_lag * (Div_int[t] + p_int[t]) / p_int_lag + \
+                    (1 - p_share_lag) * (1 + par.delta_q * q[t]) / q_lag -1
+            A_t = A_lag - dA(A_lag, ra[t])
+            p_share[t] = p_int[t] / A_t
+
+        # # this is just so see what happens if there isnt this big movement in ra[0] for a mp shock
+        # for t in range(par.T):
+        #     A_lag = A[t - 1] if t > 0 else par.A_target
+        #     A_t = A_lag - dA(A_lag, ra[t])
+        #     p_share[t] = p_int[t] / A_t
+        # for t_ in range(par.T):
+        #     t = (par.T - 1) - t_
+        #     if t == 0:
+        #         ra[t] == ss.ra
+        #     if t < par.T-1:
+        #         ra[t+1] =  p_share[t] * (Div_int[t+1] + p_int[t+1]) / p_int[t] + \
+        #             (1 - p_share[t]) * (1 + par.delta_q * q[t+1]) / q[t] - 1
+
+
+
+
+        # for t in range(par.T):
+        #     # ra
+        #     p_eq_lag = p_eq[t - 1] if t > 0 else ini.p_eq
+        #     q_lag = q[t - 1] if t > 0 else ini.q
+        #     hh_wealth_lag = hh_wealth[t - 1] if t > 0 else ini.hh_wealth
+        #     p_share[t] = p_eq / hh_wealth
+        #     ra[t] = p_share[t] * (Div[t] + p_eq[t]) / p_eq_lag \
+        #          + (1 - p_share[t]) * (1 + par.delta_q * q[t]) / q_lag - 1
 
 
         ###
@@ -378,7 +417,13 @@ def block_pre(par, ini, ss, path, ncols=1):
         #     Z[:] = (1 - tau[t]) * w[t] * N[t]
         #     qB[t] = q[t] * B[t]
 
+
+
         hh_wealth[:] = p_eq + qB
+
+
+
+
 
 
 @nb.njit
@@ -407,7 +452,7 @@ def block_post(par,ini,ss,path,ncols=1):
         C_hh = path.C_hh[ncol, :]
         L_hh = path.L_hh[ncol, :]
         A_hh = path.A_hh[ncol, :]
-        # UCE_hh = path.UCE_hh[ncol, :]
+        UCE_hh = path.UCE_hh[ncol, :]
         qB = path.qB[ncol, :]
         w = path.w[ncol, :]
         q = path.q[ncol, :]
@@ -463,8 +508,9 @@ def block_post(par,ini,ss,path,ncols=1):
             # outputs: Pi_w
         for t_ in range(par.T):
             t = (par.T - 1) - t_
-            u_prime_e = integrate_marg_util(c[t], D[t], par.z_grid, par.sigma)
-            s_w[t] = par.nu * N[t] ** (1/par.frisch) / ( (1 - tau[t]) * w[t] * u_prime_e)
+            s_w[t] = par.nu * N[t] ** (1 / par.frisch) / ((1 - tau[t]) * w[t] * UCE_hh[t])
+            # u_prime_e = integrate_marg_util(c[t], D[t], par.z_grid, par.sigma)
+            # s_w[t] = par.nu * N[t] ** (1/par.frisch) / ( (1 - tau[t]) * w[t] * u_prime_e)
 
             Pi_w_plus = Pi_w[t + 1] if t < par.T - 1 else ss.Pi_w
             Pi_w[t] = bisection(NKPC_w_eq, -0.2, 0.2, args=(par, s_w[t], Pi_w_plus))
@@ -473,7 +519,7 @@ def block_post(par,ini,ss,path,ncols=1):
         # targets #
         ###########
 
-        # Fisher equation (with r not predetermined - as they describe it: ex-ante real interest rate?)
+        # Fisher equation (with r as ex-ante real interest rate)
         for t_ in range(par.T):
             t = (par.T - 1) - t_
             Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
