@@ -128,7 +128,6 @@ def jacs(model,s_list=None,dx=1e-4):
 
         # b. fake news
         model._compute_jac_hh(dx=dx,do_print=True,do_direct=False)
-        # TODO: check if working (change 15.10)
         if hasattr(par, 'inattention'):
             model.jac_hh = model._compute_sticky_jacs_hh(model.jac_hh)
 
@@ -172,6 +171,7 @@ def jacs(model,s_list=None,dx=1e-4):
             print('')
 
     # e. condition numbers - full Jacobian
+    # TODO: change back to parallel = True
     model._compute_jac(inputs='unknowns',dx=dx,do_print=True, parallel=True)
     model._compute_jac(inputs='shocks',dx=dx,do_print=True, parallel=True)
     print('')

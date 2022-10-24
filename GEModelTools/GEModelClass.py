@@ -5,28 +5,19 @@ from copy import deepcopy
 import numpy as np
 
 
-
-if os.environ.get('NUMBA_DISABLE_JIT') == 1:
-    from .replaced_functions import no_jit as jit   # no numba compiling
-else:
-    from EconModel import jit
-
+from EconModel import jit
 from consav.misc import elapsed
 
 from . import tests
-# from .simulate_hh import find_i_and_w_1d_1d, find_i_and_w_1d_1d_path
-# from .simulate_hh import simulate_hh_forwards_endo, simulate_hh_forwards_exo
 from .replaced_functions import find_i_and_w_1d_1d, find_i_and_w_1d_1d_path
 from .replaced_functions import simulate_hh_forwards_endo, simulate_hh_forwards_exo
 from .replaced_functions import simulate_hh_forwards_endo_transpose, simulate_hh_forwards_exo_transpose
-# TODO: delete
-# from .replaced_functions import simulate_hh_forwards_endo_transpose_old, simulate_hh_forwards_exo_transpose_old
 from .simulate_hh import simulate_hh_ss, simulate_hh_path, simulate_hh_z_path
 from .broyden_solver import broyden_solver
 from .simulate import update_IRF_hh,simulate_agg,simulate_agg_hh
 from .figures import show_IRFs
 
-from .replaced_functions import no_jit
+# from .replaced_functions import no_jit
 
 class GEModelClass:
 
@@ -1133,16 +1124,16 @@ class GEModelClass:
                 x0 = x_ss.ravel().copy()
                 x0[i] += dx
 
-                # # for debugging:
-                # # store which variable is shocked
-                # n_i = len(inputs)
-                # if i < (x_ss.size / len(inputs)):
-                #     shock_at = inputs[0] + '[' + str(i) + ']'
-                # elif i < (x_ss.size / len(inputs))*2:
-                #     shock_at = inputs[1] + '[' + str(i-100) + ']'
-                # elif i < (x_ss.size / len(inputs))*3:
-                #     shock_at = inputs[1] + '[' + str(i-200) + ']'
-                # print('shock at: ' + shock_at)
+                # for debugging:
+                # store which variable is shocked
+                n_i = len(inputs)
+                if i < (x_ss.size / len(inputs)):
+                    shock_at = inputs[0] + '[' + str(i) + ']'
+                elif i < (x_ss.size / len(inputs))*2:
+                    shock_at = inputs[1] + '[' + str(i-100) + ']'
+                elif i < (x_ss.size / len(inputs))*3:
+                    shock_at = inputs[1] + '[' + str(i-200) + ']'
+                print('shock at: ' + shock_at)
 
 
                 # ii. evaluations
@@ -1171,6 +1162,8 @@ class GEModelClass:
             
     def compute_jacs(self,dx=1e-4,skip_hh=False,inputs_hh_all=None,skip_shocks=False,do_print=False,parallel=True,do_direct=False):
         """ compute all Jacobians """
+
+        par = self.par
 
         if not skip_hh and len(self.outputs_hh) > 0:
             if do_print: print('household Jacobians:')
@@ -1212,24 +1205,6 @@ class GEModelClass:
             # input
             jac_sticky[key] = jac_sticky_temp
         return jac_sticky
-
-
-    # def compute_sticky_jacs(self,do_print=False):
-    #     """ compute sticky information Jacobians"""
-    #
-    #     t0 = time.time()
-    #
-    #     # sticky information Jacobians only relevant for the household jacobians
-    #     if do_print: print('household Jacobians:')
-    #     self.jac_sticky_hh = self._compute_sticky_jacs_hh(self.jac_hh)
-    #     if do_print: print('')
-    #
-    #     # sticky household jacobians change
-    #     # H_U
-    #     # H_Z
-    #     # G_U
-    #
-    #     if do_print: print(f'sticky information Jacobians calculated in {elapsed(t0)}')
 
 
     ####################################

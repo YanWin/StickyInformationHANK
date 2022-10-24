@@ -31,34 +31,62 @@ def NKPC_w_eq(x, par, s_w, Pi_w_plus):
 
     return NKPC_w
 
-# Question: scale inv adjustment costs?
-@nb.njit
-def adj_costs(K, K_plus, phi, delta_K):
-    I = K_plus - (1 - delta_K) * K
-    adj_costs = phi / 2 * (I / K - delta_K) ** 2 * K
-    adj_costs_deriv1 = phi * (I / K  - delta_K)
-    adj_costs_deriv2 = phi / K
-    return adj_costs, adj_costs_deriv1, adj_costs_deriv2
 
-@nb.njit
-def inv_eq(Q, K, K_plus, K_plus2, K_plus3, r_plus, delta_K, phi_K):
-    S, S1, _ = adj_costs(K_plus, K_plus2, phi_K, delta_K)
-    _, S1_plus, _ = adj_costs(K_plus2, K_plus3, phi_K, delta_K)
-    I = K_plus - (1 - delta_K) * K
-    I_plus = K_plus2 - (1 - delta_K) * K_plus
-    I_plus2 = K_plus3 - (1 - delta_K) * K_plus2
-    LHS = 1 + S + I_plus / I * S1
-    RHS = Q + (1 / (1 + r_plus)) * (I_plus2 / I_plus) ** 2 * S1_plus
-    inv_target = LHS - RHS
-    # for numerical stability. Otherwise dx in solving the jacobian gets out of hand
-    if abs(inv_target) < 1e-8:
-        inv_target = 0
-    return inv_target
+# @nb.njit
+# def unpack_kwargs(d):
+#     """ simple unpacking funtion specific to the current residual function"""
+#     return d['par'], d['ss'], d['Y'], d['w'], d['r'], d['t_predet']
+# 
+# @nb.njit
+# def flat_to_I_Q(x, t_predet, T, ss):
+#     """ Flat array into seperate arrays for I_t+1/I_t and Q"""
+#     I = np.empty(T)
+#     Q = np.empty(T)
+# 
+#     # mask_I = mask_Q = np.ones(T, bool)
+#     # mask_I[t_predet['I_plus_div_I']] = False
+#     # mask_Q[t_predet['Q']] = False
+# 
+#     # for numba
+#     mask_I = np.ones(T,  nb.bool_)
+#     mask_Q = np.ones(T,  nb.bool_)
+#     for v in t_predet['I']:
+#         mask_I[v] = False
+#     for v in t_predet['Q']:
+#         mask_Q[v] = False
+# 
+#     I[mask_I] = x[:(T - len(t_predet['I']))]
+#     I[np.invert(mask_I)] = ss.I
+# 
+#     Q[mask_Q] = x[(T - len(t_predet['I'])):]
+#     Q[np.invert(mask_Q)] = ss.Q
+# 
+#     return I, Q
+
 
 @nb.njit
 def unpack_kwargs(d):
     """ simple unpacking funtion specific to the current residual function"""
-    return d['par'], d['ss'], d['Y'], d['w'], d['r'], d['t_predet']
+    return d['par'], d['ss'], d['Y'], d['w'], d['r']
+
+@nb.njit
+def adj_costs(I_frac, phi, delta_K):
+    adj_costs = phi / 2 * (I_frac - 1.0) ** 2
+    adj_costs_deriv1 = phi * (I_frac - 1.0)
+    adj_costs_deriv2 = phi
+    return adj_costs, adj_costs_deriv1, adj_costs_deriv2
+
+@nb.njit
+def inv_eq(Q, I_frac, I_frac_plus, r_plus, delta_K, phi_K):
+    S, S1, _ = adj_costs(I_frac, phi_K, delta_K)
+    _, S1_plus, _ = adj_costs(I_frac_plus, phi_K, delta_K)
+    LHS = 1.0 + S + I_frac * S1
+    RHS = Q + (1.0 / (1.0 + r_plus)) * I_frac_plus ** 2 * S1_plus
+    inv_target = LHS - RHS
+    # for numerical stability. Otherwise dx in solving the jacobian gets out of hand
+    if abs(inv_target) < 1e-12:
+        inv_target = 0
+    return inv_target
 
 @nb.njit
 def residual(x, kwargs_dict):
@@ -67,70 +95,76 @@ def residual(x, kwargs_dict):
         :arg x: flattened np.array containing the unknowns"""
 
     # unpack
-    par, ss, Y, w, r, t_predet = unpack_kwargs(kwargs_dict)
+    par, ss, Y, w, r = unpack_kwargs(kwargs_dict)
 
     # get values for K and Q. For predetermined values take ss values
-    K, Q = flat_to_K_Q(x, t_predet, par.T, ss)  # back out the unknows from the flattened array
+    I_frac = x[:par.T]
+    Q = x[par.T:]
 
-    # init target arrays
-    target1 = np.empty_like(Q)
-    target2 = np.empty_like(K)
-
-    # labor block
+    # init arrays
+    K = np.empty(par.T + 2)
+    I = np.empty(par.T + 1)
+        # targets
+    target1 = np.empty(par.T)
+    target2 = np.empty(par.T)
+        # labor block
     N = np.empty_like(K)
     s = np.empty_like(K)
     rk = np.empty_like(K)
-    N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
-    s[:] = w * N / Y / (1 - par.alpha)
-    rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
-
-    # calculate values for target equation
 
     for t in range(par.T):
+        if t == 0:
+            I[t] = ss.I
+            K[t] = ss.K
+            I[t + 1] = I_frac[t] * I[t]
+            K[t + 1] = (1 - par.delta_K) * K[t] + I[t]
+        elif t < par.T - 1:
+            I[t + 1] = I_frac[t] * I[t]
+            K[t + 1] = (1 - par.delta_K) * K[t] + I[t]
+        else:
+            # needed to calculate rk_t+2
+            K[par.T] = (1 - par.delta_K) * K[par.T - 1] + I[par.T - 1]
+            I[par.T] = I_frac[par.T - 1] * I[par.T - 1]
+            K[par.T + 1] = (1 - par.delta_K) * K[par.T] + I[par.T]
 
-        # K_lag = K[t - 1] if t > 0 else ss.K
-        K_plus = K[t + 1] if t < par.T - 1 else ss.K
-        K_plus2 = K[t + 2] if t < par.T - 2 else ss.K
-        K_plus3 = K[t + 3] if t < par.T - 3 else ss.K
+    # predetermined values
+    assert abs(I[0] - ss.I) < 1e-12, 'I[0] != ss.I'
+
+    # calculate labor block
+    for t in range(par.T + 2):
+        if t < par.T:
+            N[t] = (Y[t] / (par.Theta * K[t] ** par.alpha)) ** (1 / (1 - par.alpha))
+            s[t] = w[t] * N[t] / Y[t] / (1 - par.alpha)
+            rk[t] = s[t] * par.alpha * par.Theta * K[t] ** (par.alpha - 1) * N[t] ** (1 - par.alpha)
+        else:
+            N[t] = (ss.Y / (par.Theta * K[t] ** par.alpha)) ** (1 / (1 - par.alpha))
+            s[t] = w[t] * N[t] / ss.Y / (1 - par.alpha)
+            rk[t] = s[t] * par.alpha * par.Theta * K[t] ** (par.alpha - 1) * N[t] ** (1 - par.alpha)
+
+    # calculate values for target equation
+    for t in range(par.T):
+        # Q_plus = Q[t + 1] if t < par.T - 1 else ss.Q
+        # r_plus = r[t + 1] if t < par.T - 1 else ss.r
+        # rk_plus2 = rk[t + 2] if t < par.T - 2 else ss.rk
+        # I_frac_plus =  I_frac[t + 1] if t < par.T - 1 else 1
+        #
+        # # calculate targets
+        # Q_t = (1 / (1 + r_plus)) * (rk_plus2 + (1 - par.delta_K) * Q_plus)
+        # target1[t] = inv_eq(Q[t], I_frac[t], I_frac_plus, r_plus, par.delta_K, par.phi_K)
+        # target2[t] = Q[t] - Q_t
+
         Q_plus = Q[t + 1] if t < par.T - 1 else ss.Q
         r_plus = r[t + 1] if t < par.T - 1 else ss.r
-        rk_plus2 = rk[t + 2] if t < par.T - 2 else ss.rk
-        N_plus2 = N[t + 2] if t < par.T - 2 else ss.N
-        s_plus2 = s[t + 2] if t < par.T - 2 else ss.s
-        rk_plus2 = rk[t + 2] if t < par.T - 2 else ss.rk
+        rk_plus2 = rk[t + 2]
+        I_frac_plus =  I_frac[t + 1] if t < par.T - 1 else ss.I/I[par.T]
 
         # calculate targets
         Q_t = (1 / (1 + r_plus)) * (rk_plus2 + (1 - par.delta_K) * Q_plus)
-        target1[t] = Q[t] - Q_t
-        # Capital in t=0,1 fixed
-        target2[t] = inv_eq(Q[t], K[t], K_plus, K_plus2, K_plus3, r_plus, par.delta_K, par.phi_K)
+        target1[t] = inv_eq(Q[t], I_frac[t], I_frac_plus, r_plus, par.delta_K, par.phi_K)
+        target2[t] = Q[t] - Q_t
 
-    # target values in T-1 always statisfied
-    return np.hstack((target2[:-1], target1[t_predet['Q']:-1]))
+    return np.hstack((target1, target2))
 
-
-
-@nb.njit
-def flat_to_K_Q(x, t_predet, T, ss):
-    """ Flat array into seperate arrays for K and Q"""
-    # old: array had the same length
-    # nx = x.shape[0]
-    # assert nx%2 == 0.0
-    # nx_half = int(nx/2)
-    # return x[:nx_half], x[nx_half:]
-    K = x[:T - t_predet['K']]
-    K = np.concatenate((np.repeat(ss.K, t_predet['K']), K))
-    Q = x[T - t_predet['K']:]
-    if t_predet['Q'] < 0:
-        Q = np.concatenate((Q, np.repeat(ss.Q, abs(t_predet['Q']))))
-    else:
-        Q = np.concatenate((np.repeat(ss.Q, t_predet['Q']), Q))
-    return K, Q
-
-# @nb.njit
-# def dA(A, ra, par, ss):
-#     return ss.r / (1 + ss.r) * (1 + ra) * A + par.chi * (
-#             (1 + ra) * A - (1 + ss.r) * par.A_target)
 
 
 @nb.njit
@@ -196,81 +230,49 @@ def block_pre(par, ini, ss, path, ncols=1):
             # inputs: r,w,Y
             # outputs: D,N,I,s
 
-        # specify initial values for solver
-        initQ = np.empty_like(Y)
-        initK = np.empty_like(Y)
-        initK[:] = ini.K
-        initQ[:] = ini.Q
-
-        # specify predetermined periods
-        t_predet = {'K': 2,
-                    'Q': 0}
-        # leave out fixed values (i.e. for K t = 0,1)
-        # otherwise jacobian would not have full rank
-        initK = initK[t_predet['K']:]
-        initQ = initQ[t_predet['Q']:]
+        init_I_frac = np.ones_like(Y)
+        init_Q = np.ones_like(Y)
 
         f_args = {'par': par,
                   'ss': ss,
                   'Y': Y,
                   'w': w,
-                  'r': r,
-                  't_predet': t_predet}
+                  'r': r}
 
-        x0 = np.hstack((initK, initQ))
+        x0 = np.hstack((init_I_frac, init_Q))
         y0 = residual(x0, kwargs_dict=f_args)
         jac = obtain_J(residual, x0, y0, kwargs_dict=f_args)
-
-
-        x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
+        # with jac=None: calculate jacobian again each iteration
+        x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, use_jac=None,
                                     tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
                                     do_print=False)
-
-        # TODO: remove?
-        # # could adjust code for residual_with_linear_continuation if seperate bounds should be implemented
-        # # also the bounds are for the targets and not K and Q directly?
-        # opti_bounds = {}
-        #
-        # if not opti_bounds:
-        #     x_end = broyden_solver_cust(residual, x0, kwargs_dict=f_args, jac=jac,
-        #                                 tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
-        #                                 do_print=False)
-        # else:
-        #     constraint_residual = residual_with_linear_continuation(residual, opti_bounds, kwargs_dict=f_args)
-        #     x_end = broyden_solver_cust(constraint_residual, x0, kwargs_dict=f_args, jac=jac,
-        #                                 tol=1e-8, max_iter=200, backtrack_fac=0.5, max_backtrack=100,
-        #                                 do_print=False)
-
-        # back out K and Q
-        K_opt, Q_opt = flat_to_K_Q(x_end, t_predet, par.T, ss)
-        K[:] = K_opt
+        # back out I, K, Q
+        I_frac_opt = x_end[:par.T]
+        Q_opt = x_end[par.T:]
         Q[:] = Q_opt
 
-        # back out Investment
         for t in range(par.T):
             if t == 0:
                 I[t] = ss.I
-            elif t >= par.T - 1:
-                I[t] = ss.K - (1 - par.delta_K) * K[t]
+                K[t] = ss.K
+                I[t + 1] = I_frac_opt[t] * I[t]
+                K[t + 1] = (1 - par.delta_K) * K[t] + I[t]
+            elif t < par.T - 1:
+                I[t + 1] = I_frac_opt[t] * I[t]
+                K[t + 1] = (1 - par.delta_K) * K[t] + I[t]
             else:
-                I[t] = K[t + 1] - (1 - par.delta_K) * K[t]
+                pass
+
+        assert abs(K[0] - ss.K) < 1e-10, 'K[0] != ss.K'
+        assert abs(K[1] - ss.K) < 1e-10, 'K[1] != ss.K'
+        # assert abs(
+        #     (1 - par.delta_K) * K[par.T - 1] + I[par.T - 1] - ss.K) < 1e-7, 'K_T != ss.K'
 
 
         N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
         s[:] = w * N / Y / (1 - par.alpha)
         rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 
-
-        # # For investment as if in the steady state
-        # I[:] = par.delta_K * ss.K
-        # for t in range(par.T):
-        #     K_lag = K[t - 1] if t > 0 else ini.K
-        #     I_lag = I[t - 1] if t > 0 else ini.I
-        #     K[t] = (1 - par.delta_K) * K_lag + I_lag
-        #
-        # N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
-        # s[:] = w * N / Y / (1-par.alpha)
-        # rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 
 
         ###
@@ -313,8 +315,10 @@ def block_pre(par, ini, ss, path, ncols=1):
             t = (par.T - 1) - t_
 
             # Div
-            K_plus = K[t + 1] if t < par.T - 1 else ss.K
-            S, _, _ = adj_costs(K[t], K_plus, par.phi_K, par.delta_K)
+            # K_plus = K[t + 1] if t < par.T - 1 else ss.K
+            # S, _, _ = adj_costs(K[t], K_plus, par.phi_K, par.delta_K)
+            I_plus = I[t + 1] if t < par.T - 1 else ss.I
+            S, _, _ = adj_costs(I_plus/I[t], par.phi_K, par.delta_K)
             psi[t] = I[t] * S
             Div[t] = Y[t] - w[t] * N[t] - I[t] - psi[t]
 

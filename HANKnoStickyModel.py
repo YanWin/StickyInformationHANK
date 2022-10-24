@@ -16,6 +16,11 @@ import helper_functions
 
 class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
+    def __init__(self, savefolder='saved', *args, **kwargs):
+        EconModelClass.__init__(self, *args, **kwargs)
+        self.savefolder = savefolder
+
+
     def settings(self):
         """ fundamental settings """
 
@@ -91,7 +96,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.v_p = 0        # Kimball superelasticity for prices
         par.v_w = 0        # Kimball superelasticity for wages
         # par.kappa_p = 0.1   # slope of Phillips curve
-        par.phi_K = 17 # 17      # elasticity of investment
+        par.phi_K = 9      # elasticity of investment
 
         # d. government
         par.rho_m = 0.89  # Taylor rule intertia
@@ -147,7 +152,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.std_em = 0.  # std. of innovation
 
         # h. misc.
-        par.T = 100  # length of transition path
+        par.T = 200  # length of transition path
         par.simT = 100  # length of simulation
 
         par.max_iter_solve = 50_000  # maximum number of iterations when solving household problem
@@ -159,7 +164,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.tol_simulate = 1e-12  # tolerance when simulating household problem
         par.tol_broyden = 1e-10  # tolerance when solving eq. system
 
-        par.start_dbeg_opti = False
+        par.start_dbeg_opti = True
 
     def allocate(self):
         """ allocate model """

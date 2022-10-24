@@ -2,4 +2,6 @@
 
 *Auclert, Adrien, Matthew Rognlie, and Ludwig Straub. Micro jumps, macro humps: Monetary policy and business cycles in an estimated HANK model. No. w26647. National Bureau of Economic Research, 2020.
 
-The work so far is summarized in the HANKnoSticky.ipynb where I run the model and plot things like the consumption function and IRFs.
+The work so far is summarized and made reproducable in notebooks in the "notebooks" folder. This folder consists of the following files:
+- HANKnoSticky.ipynb reproduces the baseline model without sticky information and carries out some testing
+- HANKSticky.ipynb reproduces the sticky information model

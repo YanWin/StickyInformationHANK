@@ -38,7 +38,7 @@ def integrate_marg_util(c, D, z_grid, sigma):
 
 
 @nb.njit
-def broyden_solver_cust(f, x0, kwargs_dict=None, jac=None,
+def broyden_solver_cust(f, x0, kwargs_dict=None, use_jac=None,
                         tol=1e-8, max_iter=100, backtrack_fac=0.5, max_backtrack=30,
                         do_print=False):
     """ numerical solver using the broyden method """
@@ -63,13 +63,12 @@ def broyden_solver_cust(f, x0, kwargs_dict=None, jac=None,
 
         if abs_diff < tol: return x
 
-        # # init jac not neccessary and will run into numba problems
-        # if not isinstance(jac, np.ndarray):
-        #     # initialize J with Newton!
-        #     if jac == None and kwargs_dict == None:
-        #         raise NotImplementedError('residual function needs kwargs_dict at the moment!')
-        #     elif jac == None:
-        #         jac = obtain_J(f, x, y, kwargs_dict)
+        if use_jac == None:
+            # initialize J with Newton
+            if use_jac == None and kwargs_dict == None:
+                raise NotImplementedError('residual function needs kwargs_dict at the moment!')
+            elif use_jac == None:
+                jac = obtain_J(f, x, y, kwargs_dict)
 
         # ii. new x
         if len(x) == len(y):
