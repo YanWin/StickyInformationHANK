@@ -1171,7 +1171,6 @@ class GEModelClass:
 
             # compute sticky information jacs
             if hasattr(par, 'inattention'):
-                # TODO: add assert that it only works for fake news method
                 self.jac_hh = self._compute_sticky_jacs_hh(self.jac_hh)
 
             if do_print: print('')

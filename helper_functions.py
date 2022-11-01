@@ -51,6 +51,9 @@ def broyden_solver_cust(f, x0, kwargs_dict=None, use_jac=None,
         print("Dimension of x, is less than dimension of y."
               " Using least-squares criterion to solve for approximate root.")
 
+    if use_jac != None:
+        jac = use_jac
+
     # b. iterate
     for it in range(max_iter):
 

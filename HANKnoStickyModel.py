@@ -38,11 +38,10 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # c. GE
         self.shocks = ['eg', 'em']  # exogenous shocks
-        self.unknowns = ['r', 'w', 'Y']  # endogenous unknowns
-        self.targets = ['fisher_res', 'w_res', 'clearing_Y']  # targets = 0
+        self.unknowns = ['r', 'w', 'Y', 'Ip']  # endogenous unknowns
+        self.targets = ['fisher_res', 'w_res', 'clearing_Y', 'invest_res']  # targets = 0
 
         # d. all variables
-        # TODO: delete the unneccesary ones to speed up the Jacobian calculation
         self.varlist = [
             'r', 'ra','rl', 'i',
             'Pi', 'Pi_w',
@@ -51,10 +50,11 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'C', 'A', 'L',
             'qB', 'w', 'rk', 'q',
             'hh_wealth',
-            'clearing_Y', 'fisher_res', 'w_res', 'mf_res',
+            'clearing_Y', 'fisher_res', 'w_res', 'invest_res',
+            'Ip', 'Pi_w_increase', 'Pi_increase',
             'eg', 'em',
             'Z', 's', 's_w', 'psi',
-            'p_eq', 'p_share', 'p_k', 'Div_k', 'p_int', 'Div_int']    # for altenative ra acluclation
+            'p_eq', 'p_share', 'p_k', 'Div_k', 'p_int', 'Div_int']
 
         # e. functions
         self.solve_hh_backwards = household_problem.solve_hh_backwards
@@ -63,9 +63,6 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
     def setup(self):
         """ set baseline parameters """
-
-        # TODO: Set targets in quarterly frequency!
-            # right now they are in annualized terms
 
         par = self.par
 
@@ -96,7 +93,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.v_p = 0        # Kimball superelasticity for prices
         par.v_w = 0        # Kimball superelasticity for wages
         # par.kappa_p = 0.1   # slope of Phillips curve
-        par.phi_K = 9      # elasticity of investment
+        par.phi_K = 9.0      # elasticity of investment
 
         # d. government
         par.rho_m = 0.89  # Taylor rule intertia

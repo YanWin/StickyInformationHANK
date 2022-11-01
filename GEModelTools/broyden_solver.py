@@ -12,6 +12,11 @@ def broyden_solver(f,x0,jac,
     x = x0.ravel()
     y = f(x)
 
+    if len(x) < len(y) and do_print:
+        print("Dimension of x, is less than dimension of y."
+              " Using least-squares criterion to solve for approximate root.")
+
+
     # b. iterate
     for it in range(max_iter):
         
@@ -36,7 +41,13 @@ def broyden_solver(f,x0,jac,
         if abs_diff < tol: return x
         
         # ii. new x
-        dx = np.linalg.solve(jac,-y)
+        if len(x) == len(y):
+            dx = np.linalg.solve(jac, -y)
+        elif len(x) < len(y):
+            dx = np.linalg.lstsq(jac, -y, rcond=None)[0]  # not allowed to use rcond=None in Numba
+        else:
+            raise ValueError("Dimension of x is greater than dimension of y."
+                             " Cannot solve underdetermined system.")
 
         # iii. evalute with backtrack
         for _ in range(max_backtrack):

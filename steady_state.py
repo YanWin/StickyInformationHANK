@@ -84,6 +84,12 @@ def evaluate_ss(model,do_print=False):
     ss.Y = 1.0
     ss.K = par.K_Y_ratio*ss.Y
     ss.I = par.delta_K*ss.K
+    # TODO: delete if not used
+    ss.Pi_w_increase = 0.0
+    ss.Pi_increase = 0.0
+    ss.Ip = ss.I
+    ss.psi = 0.0
+    #
     ss.G = par.G_Y_ratio*ss.Y
     ss.qB = par.qB_Y_ratio*ss.Y
     ss.B = par.qB_Y_ratio*ss.Y/ss.q
