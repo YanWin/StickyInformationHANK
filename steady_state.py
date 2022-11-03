@@ -89,6 +89,7 @@ def evaluate_ss(model,do_print=False):
     ss.Pi_increase = 0.0
     ss.Ip = ss.I
     ss.psi = 0.0
+    # ss.k_dummy = 0.0
     #
     ss.G = par.G_Y_ratio*ss.Y
     ss.qB = par.qB_Y_ratio*ss.Y
@@ -130,7 +131,7 @@ def evaluate_ss(model,do_print=False):
     ss.A = ss.hh_wealth - ss.L
     par.A_target = par.hh_wealth_Y_ratio-par.L_Y_ratio
     # ss.p_eq = ss.hh_wealth-ss.qB # old
-    ss.p_share = ss.p_int/ss.A   # TODO: chek if correct, otherwise change back to p_eq
+    ss.p_share = ss.p_eq/ss.A
     # ss.ra2 = ss.p_share*(ss.Div+ss.p_eq)/ss.p_eq+(1-ss.p_share)*(1+ss.rl)-1
 
     ss.C = ss.Y - ss.G - ss.I - par.xi * ss.L
