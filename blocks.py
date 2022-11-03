@@ -50,7 +50,9 @@ def block_pre(par, ini, ss, path, ncols=1):
         fisher_res = path.fisher_res[ncol, :]
         w_res = path.w_res[ncol, :]
         invest_res = path.invest_res[ncol, :]
-        # valuation_res = path.valuation_res[ncol, :]
+        valuation_res = path.valuation_res[ncol, :]
+        NKPC_res = path.NKPC_res[ncol, :]
+        NKPC_w_res = path.NKPC_w_res[ncol, :]
         # k_res = path.k_res[ncol, :]
         em = path.em[ncol, :]
         eg = path.eg[ncol, :]
@@ -102,9 +104,10 @@ def block_pre(par, ini, ss, path, ncols=1):
             r_plus = r[t + 1] if t < par.T - 1 else ss.r
             rk_plus2 = rk[t + 2] if t < par.T - 2 else ss.rk
 
-            Q[t] = 1.0 / (1.0 + r_plus) * (rk_plus2 + (1.0 - par.delta_K * Q_plus))
+            Q_t = 1.0 / (1.0 + r_plus) * (rk_plus2 + (1.0 - par.delta_K) * Q_plus)
+            valuation_res[t] = Q_t - Q[t]
 
-        # investment residual
+            # investment residual
         for t in range(par.T):  # par.T-1
             Ip_plus = Ip[t + 1] if t < par.T - 1 else ss.I
             r_plus = r[t + 1] if t < par.T - 1 else ss.r
@@ -123,17 +126,21 @@ def block_pre(par, ini, ss, path, ncols=1):
             # input: s
             # output: Pi
 
-        # NKPC given in the form Pi[t] - Pi[t - 1] = a + b * E(Pi[t + 1] - Pi[t])
-        # so I first get Pi[t] - Pi[t - 1] and then back out Pi[t]
+        # NKPC in the form Pi[t] - Pi[t - 1] = kappa * E(sum(s-markup))
         for t_ in range(par.T):
             t = (par.T - 1) - t_
-            Pi_increase_plus = Pi_increase[t + 1] if t < par.T - 1 else 0
             kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + r[t])) / par.xi_p \
                     * par.e_p / (par.v_p + par.e_p - 1)
-            Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + r[t])) * Pi_increase_plus
+            gap = 0
+            for k in range(t_+1):
+                gap += (1 / (1 + r[t])) ** k * (s[t + k] - (par.e_p - 1) / par.e_p)
+            Pi_increase[t] = kappa * gap
+
         for t in range(par.T):
-            Pi_lag = Pi[t - 1] if t > 0 else ss.Pi
-            Pi[t] = Pi[t - 1] + Pi_increase[t]
+            Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
+            Pi_t = Pi[t - 1] + Pi_increase[t]
+            NKPC_res[t] = Pi_t - Pi[t]
+
 
         ###
         # c. Taylor rule block
@@ -142,10 +149,10 @@ def block_pre(par, ini, ss, path, ncols=1):
             # outputs: i
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
-            i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
-                   * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+            # i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** (par.rho_m) \
+            #        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
             # simple taylor rule
-            # i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
+            i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
 
         ###
         # d. Finance block
@@ -277,7 +284,9 @@ def block_post(par,ini,ss,path,ncols=1):
         fisher_res = path.fisher_res[ncol, :]
         w_res = path.w_res[ncol, :]
         invest_res = path.invest_res[ncol, :]
-        # valuation_res = path.valuation_res[ncol, :]
+        valuation_res = path.valuation_res[ncol, :]
+        NKPC_res = path.NKPC_res[ncol, :]
+        NKPC_w_res = path.NKPC_w_res[ncol, :]
         # k_res = path.k_res[ncol, :]
         em = path.em[ncol, :]
         eg = path.eg[ncol, :]
@@ -323,19 +332,22 @@ def block_post(par,ini,ss,path,ncols=1):
         ###
             # inputs C_hh, w, tau, pi
             # outputs: Pi_w
+
+        # NKPC-wage given in the form Pi_w_t - Pi_t = kappa_w * E[sum(s_w - markup)]
+        kappa_w = (1 - par.xi_w) * (1 - par.xi_w * par.beta_mean) / par.xi_w \
+                  * par.e_w / (par.v_w + par.e_w - 1)
         for t_ in range(par.T):
             t = (par.T - 1) - t_
-            Pi_w_increase_plus = Pi_w_increase[t + 1] if t < par.T - 1 else ss.Pi_w - ss.Pi
-
             s_w[t] = par.nu * N[t] ** (1 / par.frisch) / ((1 - tau[t]) * w[t] * UCE_hh[t])
-
-            kappa_w = (1 - par.xi_w) * (1 - par.xi_w * par.beta_mean) / par.xi_w \
-                    * par.e_w / (par.v_w + par.e_w - 1)
-            Pi_w_increase[t] = kappa_w * (s_w[t] - (par.e_w - 1) / par.e_w)  + par.beta_mean * Pi_w_increase_plus
+            gap_w = 0
+            for k in range(t_+1):
+                gap_w += par.beta_mean ** k * (s_w[t + k] - (par.e_w - 1) / par.e_w)
+            Pi_w_increase[t] = kappa_w * gap_w
 
         for t in range(par.T):
             Pi_lag = Pi[t - 1] if t > 0 else ss.Pi
-            Pi_w[t] = Pi_lag + Pi_w_increase[t]
+            Pi_w_t = Pi_lag + Pi_w_increase[t]
+            NKPC_w_res[t] = Pi_w_t - Pi_w[t]
 
         ###########
         # targets #

@@ -38,8 +38,8 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # c. GE
         self.shocks = ['eg', 'em']  # exogenous shocks
-        self.unknowns = ['r', 'w', 'Y', 'Ip']  # endogenous unknowns
-        self.targets = ['fisher_res', 'w_res', 'clearing_Y', 'invest_res']  # targets = 0
+        self.unknowns = ['r', 'w', 'Y', 'Ip', 'Q', 'Pi', 'Pi_w']  # endogenous unknowns
+        self.targets = ['fisher_res', 'w_res', 'clearing_Y', 'invest_res', 'valuation_res', 'NKPC_res', 'NKPC_w_res']  # targets = 0
 
         # d. all variables
         self.varlist = [
@@ -50,7 +50,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'C', 'A', 'L',
             'qB', 'w', 'rk', 'q',
             'hh_wealth',
-            'clearing_Y', 'fisher_res', 'w_res', 'invest_res',
+            'clearing_Y', 'fisher_res', 'w_res', 'invest_res', 'valuation_res', 'NKPC_res', 'NKPC_w_res',
             'Ip', 'Pi_w_increase', 'Pi_increase',
             'eg', 'em',
             'Z', 's', 's_w', 'psi',
@@ -96,7 +96,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.phi_K = 9.0      # elasticity of investment
 
         # d. government
-        par.rho_m = 0.89  # Taylor rule intertia
+        par.rho_m = 0.6  # Taylor rule intertia - 0.89
         par.phi_pi = 1.5  # Taylor rule coefficient
         par.phi_tau = 0.1     # Response of tax rate to debt (p.a.)
         par.phi_G = 0     # Tax financing of government expenditure shock

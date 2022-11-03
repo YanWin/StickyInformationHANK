@@ -1338,7 +1338,9 @@ class GEModelClass:
         assert use_jac_hh or ncols == 1
         
         # a. update initial distribution
-        self._set_ini(ini_input=ini)
+        # TODO: reverse comment?
+        self._set_ini(ini_input='ss')
+        # self._set_ini(ini_input=ini)
 
         # b. before household block
         with jit(self,show_exc=True) as model:
@@ -1426,7 +1428,9 @@ class GEModelClass:
                 x0[i,:] = getattr(self.path,varname)[0,:]
 
         # c. set initial state
-        self._set_ini(ini_input=ini)
+        # TODO: use comment
+        self._set_ini(ini_input='ss')
+        # self._set_ini(ini_input=ini)
 
         # d. solve
         obj = lambda x: self._evaluate_H(x)
