@@ -118,7 +118,8 @@ def evaluate_ss(model, do_print=False):
     # f. all firms
     ss.Div = ss.Y - ss.w * ss.N - ss.I
     ss.p_eq = ss.Div / ss.r
-    ss.p_share = ss.p_eq / ss.A
+    # TODO: delete if not used
+    # ss.p_share = ss.p_eq / ss.A
 
     assert np.isclose(ss.Div - ss.Div_int - ss.Div_k, 0.0)
 
@@ -143,6 +144,9 @@ def evaluate_ss(model, do_print=False):
     ss.clearing_Y = ss.Y - (ss.C_hh + ss.G + ss.I + ss.psi + par.xi * ss.L)
     ss.clearing_A = ss.A_hh - ss.A
     ss.clearing_L = ss.L_hh - ss.L
+    ss.clearing_fund_start = (1 + ss.ra) * ss.A + (1 + ss.rl) * ss.L\
+                             - ((1 + par.delta_q * ss.q) * ss.B + (ss.p_eq + ss.Div) - par.xi * ss.L)
+    ss.clearing_fund_end = ss.p_eq + ss.q * ss.B - (ss.A + ss.L)
 
 
 def objective_ss(x, model, do_print=False):

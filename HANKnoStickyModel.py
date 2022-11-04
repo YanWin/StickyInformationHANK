@@ -30,8 +30,8 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # c. GE
         self.shocks = ['eg','em']  # exogenous shocks
-        self.unknowns = ['r','w','Y','Ip','Q','Pi','Pi_w']  # endogenous unknowns
-        self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res','NKPC_res','NKPC_w_res']  # targets = 0
+        self.unknowns = ['r','w','Y','Ip','Q']  # endogenous unknowns
+        self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res']  # targets = 0
 
         # d. all variables
         self.varlist = [
@@ -41,6 +41,8 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'clearing_L',
             'clearing_Y',
             'clearing_Y',
+            'clearing_fund_start',
+            'clearing_fund_end',
             'Div_int',
             'Div_k',
             'Div',
@@ -55,8 +57,6 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'K',
             'L',
             'N',
-            'NKPC_res',
-            'NKPC_w_res',
             'p_eq',
             'p_int',
             'p_k',
@@ -130,7 +130,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.v_p = 0 # Kimball superelasticity for prices
 
         # d. capital goods firms
-        par.phi_K = 9.0      # elasticity of investment
+        par.phi_K = 9.0      # (inverse of the) elasticity of investment
 
         # e. unions
         par.xi_w = 0.899 # calvo wage stickiness

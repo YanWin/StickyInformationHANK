@@ -17,6 +17,8 @@ def block_pre(par, ini, ss, path, ncols=1):
         clearing_L = path.clearing_L[ncol, :]
         clearing_Y = path.clearing_Y[ncol, :]
         clearing_Y = path.clearing_Y[ncol, :]
+        clearing_fund_start = path.clearing_fund_start[ncol, :]
+        clearing_fund_end = path.clearing_fund_end[ncol, :]
         Div_int = path.Div_int[ncol, :]
         Div_k = path.Div_k[ncol, :]
         Div = path.Div[ncol, :]
@@ -31,8 +33,6 @@ def block_pre(par, ini, ss, path, ncols=1):
         K = path.K[ncol, :]
         L = path.L[ncol, :]
         N = path.N[ncol, :]
-        NKPC_res = path.NKPC_res[ncol, :]
-        NKPC_w_res = path.NKPC_w_res[ncol, :]
         p_eq = path.p_eq[ncol, :]
         p_int = path.p_int[ncol, :]
         p_k = path.p_k[ncol, :]
@@ -74,12 +74,10 @@ def block_pre(par, ini, ss, path, ncols=1):
         # outputs: D,N,I,s
 
         # Ip -> I and K
+        Ip_lag = lag(ini.Ip, Ip)
+        I[:] = Ip_lag
         for t in range(par.T):
             K_lag = K[t - 1] if t > 0 else ini.K
-            if t == 0:
-                I[t] = ini.I
-            else:
-                I[t] = Ip[t - 1]
             K[t] = (1 - par.delta_K) * K_lag + I[t]
 
         N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
@@ -96,7 +94,7 @@ def block_pre(par, ini, ss, path, ncols=1):
             Q_t = 1.0 / (1.0 + r_plus) * (rk_plus2 + (1.0 - par.delta_K) * Q_plus)
             valuation_res[t] = Q_t - Q[t]
 
-            # investment residual
+        # investment residual
         for t in range(par.T):  # par.T-1
             Ip_plus = Ip[t + 1] if t < par.T - 1 else ss.I
             r_plus = r[t + 1] if t < par.T - 1 else ss.r
@@ -115,21 +113,18 @@ def block_pre(par, ini, ss, path, ncols=1):
         # input: s
         # output: Pi
 
+
         for t_ in range(par.T):
             t = (par.T - 1) - t_
+            Pi_increase_plus = Pi_increase[t + 1] if t < par.T - 1 else 0
 
             kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + r[t])) / par.xi_p \
                     * par.e_p / (par.v_p + par.e_p - 1)
-
-            gap = 0
-            for k in range(t_ + 1):
-                gap += (1 / (1 + r[t])) ** k * (s[t + k] - (par.e_p - 1) / par.e_p)
-
-            Pi_increase[t] = kappa * gap
+            Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + r[t])) * Pi_increase_plus
 
         for t in range(par.T):
             Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
-            NKPC_res[t] = (Pi[t] - Pi_lag) - Pi_increase[t]
+            Pi[t] = Pi_increase[t] + Pi_lag
 
         ###
         # c. Taylor rule block
@@ -137,7 +132,6 @@ def block_pre(par, ini, ss, path, ncols=1):
 
         # inputs: Pi
         # outputs: i
-
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
             i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
@@ -148,10 +142,8 @@ def block_pre(par, ini, ss, path, ncols=1):
 
         # inputs: Div, r
         # outputs: q, rl, ra
-
-        for t in range(par.T):
-            r_lag = r[t - 1] if t > 0 else ini.r
-            rl[t] = r_lag - par.xi
+        r_lag = lag(ini.r, r)
+        rl[:] = r_lag - par.xi
 
         # Dividends
         I_lag = lag(ini.I, I)
@@ -185,19 +177,20 @@ def block_pre(par, ini, ss, path, ncols=1):
             p_int_plus = p_int[t + 1] if t < par.T - 1 else ss.p_int
             p_int[t] = (p_int_plus + Div_int_plus) / (1 + r[t])
 
+        # TODO: delete
         # # ra
         # A_t = par.A_target
         # for t in range(par.T):
-
+        #
         #     p_eq_lag = p_eq[t-1] if t > 0 else ini.p_eq
         #     q_lag = q[t-1] if t > 0 else ini.q
         #     p_share_lag = p_share[t-1] if t > 0 else ini.p_share
-
+        #
         #     ra[t] = p_share_lag*(Div[t]+p_eq[t])/p_eq_lag + \
         #             (1-p_share_lag)*(1+par.delta_q*q[t])/q_lag-1
-
+        #
         #     A_t = A_t - (par.chi*((1+ra[t])*A_t-(1+ss.r)*par.A_target))
-
+        #
         #     p_share[t] = p_eq[t] / A_t
 
         A_lag = ini.A
@@ -207,6 +200,7 @@ def block_pre(par, ini, ss, path, ncols=1):
 
         ra[0] = (term_B + term_eq - term_L) / A_lag - 1
         ra[1:] = r[:-1]
+
 
         # possibility: test whether eq. (7) holds
 
@@ -218,11 +212,18 @@ def block_pre(par, ini, ss, path, ncols=1):
         # Outputs: tau, Z, G
 
         G[:] = ss.G * (1 + eg)
-
         for t in range(par.T):
             B_lag = B[t - 1] if t > 0 else ini.B
-            tau[t] = ss.tau + par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y
-            B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] - tau[t] * w[t] * N[t]) / q[t]
+            # tau without fiscal policy shock
+            tau_no_shock = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
+            # changes of tax rate depending on the shock and fraction of tax financing
+            delta_tau = ((1 - par.phi_G) * ss.G * eg[t]) / w[t] / N[t]
+            tau[t] = delta_tau + tau_no_shock
+            # gov bonds without shock
+            B_no_shock = (ss.G + (1 + par.delta_q * q[t]) * B_lag - tau_no_shock * w[t] * N[t]) / q[t]
+            # changes in B depending on shock and fraction of tax financing
+            delta_B = par.phi_G * ss.G * eg[t] / q[t]
+            B[t] = delta_B + B_no_shock
             qB[t] = q[t] * B[t]
             Z[t] = (1 - tau[t]) * w[t] * N[t]
 
@@ -240,6 +241,8 @@ def block_post(par, ini, ss, path, ncols=1):
         clearing_L = path.clearing_L[ncol, :]
         clearing_Y = path.clearing_Y[ncol, :]
         clearing_Y = path.clearing_Y[ncol, :]
+        clearing_fund_start = path.clearing_fund_start[ncol, :]
+        clearing_fund_end = path.clearing_fund_end[ncol, :]
         Div_int = path.Div_int[ncol, :]
         Div_k = path.Div_k[ncol, :]
         Div = path.Div[ncol, :]
@@ -254,8 +257,6 @@ def block_post(par, ini, ss, path, ncols=1):
         K = path.K[ncol, :]
         L = path.L[ncol, :]
         N = path.N[ncol, :]
-        NKPC_res = path.NKPC_res[ncol, :]
-        NKPC_w_res = path.NKPC_w_res[ncol, :]
         p_eq = path.p_eq[ncol, :]
         p_int = path.p_int[ncol, :]
         p_k = path.p_k[ncol, :]
@@ -294,30 +295,25 @@ def block_post(par, ini, ss, path, ncols=1):
                   * par.e_w / (par.v_w + par.e_w - 1)
 
         for t_ in range(par.T):
-
             t = (par.T - 1) - t_
+            Pi_w_increase_plus = Pi_w_increase[t + 1] if t < par.T - 1 else ss.Pi_w - ss.Pi
 
             s_w[t] = par.nu * N[t] ** (1 / par.frisch) / ((1 - tau[t]) * w[t] * UCE_hh[t])
-            gap_w = 0
-            for k in range(t_ + 1):
-                gap_w += par.beta_mean ** k * (s_w[t + k] - (par.e_w - 1) / par.e_w)
 
-            Pi_w_increase[t] = kappa_w * gap_w
+            Pi_w_increase[t] = kappa_w * (s_w[t] - (par.e_w - 1) / par.e_w) + par.beta_mean * Pi_w_increase_plus
+
 
         for t in range(par.T):
             Pi_lag = Pi[t - 1] if t > 0 else ss.Pi
-            NKPC_w_res[t] = (Pi_w[t] - Pi_lag) - Pi_w_increase[t]
+            Pi_w[t] = Pi_w_increase[t] + Pi_lag
 
         # Fisher equation
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
-            Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
-            fisher_res[t] = 1 + i[t] - (1 + r[t]) * (1 + Pi_plus)
+        Pi_plus = lead(Pi, ss.Pi)
+        fisher_res[:] = 1 + i - (1 + r) * (1 + Pi_plus)
 
         # wage residual (approximate)
-        for t in range(par.T):
-            w_lag = w[t - 1] if t > 0 else ini.w
-            w_res[t] = np.log(w[t] / w_lag) - (Pi_w[t] - Pi[t])
+        w_lag = lag(ini.w, w)
+        w_res[:] = np.log(w / w_lag) - (Pi_w- Pi)
 
         # market clearing
         L_hh_lag = lag(ini.L_hh, L_hh)
@@ -328,3 +324,11 @@ def block_post(par, ini, ss, path, ncols=1):
         A[:] = p_eq + qB - L
         clearing_A[:] = A_hh - A
         clearing_L[:] = L_hh - L
+
+        A_hh_lag = lag(ini.A_hh, A_hh)
+        B_lag = lag(ini.B, B)
+        # clearing at the beginning of the period
+        clearing_fund_start[:] = (1 + ra) * A_hh_lag + (1 + rl) * L_hh_lag - \
+                                 ((1 + par.delta_q * q) * B_lag + (p_eq + Div) - par.xi * L_hh_lag)
+        # clearing at the end of the period
+        clearing_fund_end[:] = p_eq + qB - (A_hh + L_hh)
