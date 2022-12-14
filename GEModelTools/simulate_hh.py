@@ -93,7 +93,7 @@ def simulate_hh_forwards_exo(Dbeg, z_trans_T, D):
 
     Nfix = Dbeg.shape[0]
 
-    if Dbeg.ndim < 4:
+    if Dbeg.ndim == 3:
 
         Nz = Dbeg.shape[1]
         Nendo1 = Dbeg.shape[2]

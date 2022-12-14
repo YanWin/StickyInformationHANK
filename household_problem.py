@@ -5,6 +5,7 @@ import numba as nb
 
 from consav.linear_interp import interp_1d_vec
 
+# TODO: change input back to only ra
 @nb.njit
 def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
@@ -12,6 +13,7 @@ def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     # unpack
     A_target = par.A_target
     r_ss = par.r_ss_target
+
 
     # solve
     for i_fix in range(par.Nfix):
@@ -25,14 +27,14 @@ def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
             # ii. inverse foc
             for i_a in range(par.Na):
 
-                a_lag = par.a_grid[i_a]
-
                 # ii. inverse foc
                 c_endo = (par.beta_grid[i_fix]*vbeg_l_a_plus[i_fix,i_z,:,i_a])**(-1/par.sigma)
                 m_endo = c_endo + par.l_grid
 
                 # ii. interpolation to fixed grid
-                d = r_ss/(1+r_ss)*(1+ra)*a_lag + par.chi*((1+ra)*a_lag-(1+r_ss)*A_target)
+                a_lag = par.a_grid[i_a]
+                a_e = (1 + ra) * a_lag
+                d = r_ss/(1+r_ss)*a_e + par.chi*(a_e-(1+r_ss)*A_target)
                 m = (1+rl)*par.l_grid + Ze + d
 
                 interp_1d_vec(m_endo,par.l_grid,m,l[i_fix,i_z,:,i_a])

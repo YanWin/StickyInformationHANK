@@ -1129,6 +1129,31 @@ class GEModelClass:
         if not (do_unknowns or do_shocks):
             return jac_dict
 
+    def _compute_sticky_jacs_hh(self, jac):
+        """ calculate sticky information household Jacobians"""
+
+        par = self.par
+
+        jac_sticky = jac.copy()
+
+        for key in jac.keys():
+            # init
+            jac_sticky_temp = np.zeros_like(jac[key])
+            # fill
+            T = jac[key].shape[0]
+            for t in range(T):
+                for s in range(T):
+                    if s == 0:
+                        jac_sticky_temp[t, s] = jac[key][t, s]
+                    elif t == 0:
+                        jac_sticky_temp[t, s] = (1 - par.inattention) * jac[key][t, s]
+                    else:
+                        jac_sticky_temp[t, s] = par.inattention * jac_sticky_temp[t - 1, s - 1] \
+                                                + (1 - par.inattention) * jac[key][t, s]
+            # input
+            jac_sticky[key] = jac_sticky_temp
+        return jac_sticky
+
     def compute_jacs(self, dx=1e-4, skip_hh=False, inputs_hh_all=None, skip_shocks=False, do_print=False, parallel=True,
                      do_direct=False):
         """ compute all Jacobians """
@@ -1136,6 +1161,11 @@ class GEModelClass:
         if not skip_hh and len(self.outputs_hh) > 0:
             if do_print: print('household Jacobians:')
             self._compute_jac_hh(inputs_hh_all=inputs_hh_all, dx=dx, do_direct=do_direct, do_print=do_print)
+            if self.par.inattention > 0.0:
+                print(f'household inattention = {self.par.inattention}')
+                if do_direct: print('household calculation based on direct method '
+                                    '-> sticky information jacs wont be correct')
+                self.jac_hh = self._compute_sticky_jacs_hh(self.jac_hh)
             if do_print: print('')
 
         if do_print: print('full Jacobians:')
@@ -1265,7 +1295,7 @@ class GEModelClass:
         if do_print: print(
             f'linear transition path found in {elapsed(t0)} [finding solution matrix: {elapsed(t0_, t1_)}]')
 
-    def evaluate_path(self, ini='ss', ncols=1, use_jac_hh=False):
+    def evaluate_path(self, ini='ss', ncols=1, use_jac_hh=True):
         """ evaluate transition path """
 
         par = self.par
@@ -1418,7 +1448,8 @@ class GEModelClass:
                   do_shocks=do_shocks, do_targets=do_targets, do_linear=do_linear,
                   T_max=T_max, ncols=ncols, filename=filename)
 
-    def compare_IRFs(self, models, labels, varnames,
+    @staticmethod
+    def compare_IRFs(models, labels, varnames,
                      abs_diff=None, lvl_value=None, facs=None, pows=None,
                      do_shocks=True, do_targets=True,
                      T_max=None, ncols=4, filename=None):
