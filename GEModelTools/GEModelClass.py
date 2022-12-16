@@ -374,6 +374,9 @@ class GEModelClass:
                 # iv. increment
                 it += 1
                 if it > par.max_iter_solve:
+                    print("max_abs_diff:")
+                    print(self.pols_hh)
+                    print([np.max(np.abs(getattr(ss, pol) - old[pol])) for pol in self.pols_hh])
                     raise ValueError('solve_hh_ss(), too many iterations')
 
         if do_print: print(f'household problem in ss solved in {elapsed(t0)} [{it} iterations]')
@@ -1265,6 +1268,29 @@ class GEModelClass:
         if do_print: print(
             f'linear transition path found in {elapsed(t0)} [finding solution matrix: {elapsed(t0_, t1_)}]')
 
+    def check_non_lin(self, p):
+
+        par = self.par
+        ss = self.ss
+        path = self.path
+
+        non_lin = False
+
+        for t in range(par.T):
+            D_agg = path.D[0].sum(axis=(0,1,2))     # aggregate mass on illiquid asset grid
+            i_a_pos = np.argwhere(D_agg > 1e-10)    # find indices with positive mass on illiquid asset grid
+            for i_a in i_a_pos:
+                lowest_income = (1 + path.rl[p,t]) * par.l_grid[0] + path.Z[p,t] * par.z_grid[0]
+                highest_redistribution = ss.ra / (1 + ss.ra) * (1 + path.ra[p,t]) * par.a_grid[i_a] + par.chi * (
+                        (1 + path.ra[p,t]) * par.a_grid[i_a] - (1 + ss.ra) * par.A_target)
+                if lowest_income + highest_redistribution < 0:
+                    non_lin = True
+        if non_lin:
+            print("negative cash-on-hand possible given paths"
+                  "-> non-linearities in policy functions")
+        else:
+            print("no non-linearities in the policy functions")
+
     def evaluate_path(self, ini='ss', ncols=1, use_jac_hh=False):
         """ evaluate transition path """
 
@@ -1280,6 +1306,8 @@ class GEModelClass:
         # b. before household block
         with jit(self, show_exc=False) as model:
             self.block_pre(model.par, model.ini, model.ss, model.path, ncols=ncols)
+
+
 
         # c. household block
         if use_jac_hh and len(self.outputs_hh) > 0:  # linearized
