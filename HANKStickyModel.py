@@ -7,7 +7,7 @@ import steady_state
 import household_problem
 import blocks
 
-class HANKnoStickyModelClass(EconModelClass, GEModelClass):
+class HANKStickyModelClass(EconModelClass, GEModelClass):
 
     def __init__(self, savefolder='saved', *args, **kwargs):
         EconModelClass.__init__(self, *args, **kwargs)
@@ -23,13 +23,13 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         # b. household
         self.grids_hh = ['l','a']  # grids
         self.pols_hh = ['l','a']  # policy functions
-        self.inputs_hh = ['Z','ra','rl']  # direct inputs
+        self.inputs_hh = ['Z','ra','rl','ez']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
         self.outputs_hh = ['c','l','a','uce']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
         # c. GE
-        self.shocks = ['eg','em']  # exogenous shocks
+        self.shocks = ['eg','em','ez']  # exogenous shocks
         self.unknowns = ['r','w','Y','Ip','Q']  # endogenous unknowns
         self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res']  # targets = 0
 
@@ -47,6 +47,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
             'Div_k',
             'Div',
             'eg',
+            'ez',
             'em',
             'fisher_res',
             'G',
@@ -130,7 +131,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.mu_p = np.nan
         par.e_p = np.nan
         par.xi_p = 0.926  # calvo price stickiness
-        par.v_p = 10*4  # Kimball superelasticity for prices - # TODO: calibrate?
+        par.v_p = 10  # Kimball superelasticity for prices - # TODO: calibrate?
 
         # d. capital goods firms
         par.phi_K = 9.0  # (inverse of the) elasticity of investment
@@ -138,7 +139,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         # e. unions
         par.xi_w = 0.899  # calvo wage stickiness
         par.e_w = np.nan
-        par.v_w = 10*4  # Kimball superelasticity for wages # TODO: calibrate?
+        par.v_w = 10  # Kimball superelasticity for wages # TODO: calibrate?
 
         # f. central bank
         par.rho_m = 0.89  # Taylor rule intertia    # TODO: estimate?
@@ -174,6 +175,10 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.jump_em = 0.00025 # initial jump
         par.rho_em = 0.6  # AR(1) coefficient
         par.std_em = 0.0  # std. of innovation
+        # 2. persistent income shock
+        par.jump_ez = 0.0  # initial jump
+        par.rho_ez = 0.6  # AR(1) coefficient
+        par.std_ez = 0.0  # std. of innovation
 
         # k. misc.
         par.T = 250  # length of transition path

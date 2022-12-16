@@ -1369,7 +1369,7 @@ class GEModelClass:
         # c. return as vector
         return errors.ravel()
 
-    def find_transition_path(self, ini='ss', unknowns_ss=True, shock_specs=None, do_end_check=True, do_print=False,
+    def find_transition_path(self, ini='ss', unknowns_ss=True, shock_specs=None, do_end_check=False, do_print=False,
                              do_print_unknowns=False):
         """ find transiton path (fully non-linear) """
 

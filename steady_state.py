@@ -111,6 +111,7 @@ def evaluate_ss(model, do_print=False):
     # shocks
     ss.eg = 0.0
     ss.em = 0.0
+    ss.ez = 0.0
 
     # b. central bank
     ss.i = ss.r

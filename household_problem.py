@@ -7,7 +7,7 @@ from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
 @nb.njit
-def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
+def solve_hh_backwards(par,z_trans,Z,ra,rl,ez,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
@@ -22,6 +22,7 @@ def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
 
             e = par.z_grid[i_z]  # productivity
             Ze = Z*e  # labor income
+            Ze += ez
 
             # ii. inverse foc
             for i_a in range(par.Na):
@@ -37,14 +38,6 @@ def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
                     # ii. interpolation to fixed grid
                     d = ra_ss/(1+ra_ss)*(1+ra)*a_lag + par.chi*((1+ra)*a_lag-(1+ra_ss)*A_target)
                     m = (1 + rl) * par.l_grid[i_l] + Ze + d
-
-                    # ensure non-negative cash-on hand and illiquid assets
-                    # for some combinations of l,e and d, m can get negative because distribution to illiquid account
-                    # (expenses) > income.
-                    # In those cases set d = income to prevent counterfactual distribution to illiquid account.
-                    # if m < 0.0:
-                    #     d = - ((1 + rl) * par.l_grid[i_l] + Ze)
-                    #     m = 0.0
 
                     l[i_fix,i_z,i_l,i_a] = interp_1d(m_endo, par.l_grid, m)
 
