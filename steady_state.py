@@ -32,11 +32,16 @@ def prepare_hh_ss(model):
     # 2. transition matrix initial distribution #
     #############################################
 
-    for i_fix in range(par.Nfix):
-        ss.Dz[i_fix, :] = e_ergodic / par.Nfix
-        for i_z in range(par.Nz):
-            ss.Dbeg[i_fix, i_z, :, :] *= 0.0
-            ss.Dbeg[i_fix, i_z, 0, 0] = ss.Dz[i_fix, i_z]
+    # start with single point distribution for each z
+    # start with optimized distribution along a grid (saves 15 sec on my pc)
+    if par.start_dbeg_opti:
+        ss.Dbeg, ss.Dz = init_optimized_Dbeg(model, e_ergodic)
+    else:
+        for i_fix in range(par.Nfix):
+            ss.Dz[i_fix, :] = e_ergodic / par.Nfix
+            for i_z in range(par.Nz):
+                ss.Dbeg[i_fix, i_z, :, :] *= 0.0
+                ss.Dbeg[i_fix, i_z, 0, 0] = ss.Dz[i_fix, i_z]
 
     ################################################
     # 3. initial guess for intertemporal variables #
@@ -58,6 +63,22 @@ def prepare_hh_ss(model):
         for i_a in range(par.Na):
             ss.vbeg_l_a[i_fix, :, :, i_a] = ss.z_trans[i_fix] @ v_l_a[i_fix, :, :, i_a]
 
+    ###############
+    # 4. warnings #
+    ###############
+
+    if par.print_non_lin_warning:
+        lowest_income = (1 + ss.rl) * par.l_grid[0] + ss.Z * par.z_grid[0]
+        highest_redistribution = ss.ra * par.a_grid[0] + par.chi * (
+                    (1 + ss.ra) * par.a_grid[0] - (1 + ss.ra) * par.A_target)
+        if lowest_income + highest_redistribution < 0:
+            print("negative cash-on-hand possible given a/l grids and steady state values "
+                  "-> non-linearities in policy functions")
+            highest_chi = - (lowest_income - ss.ra * par.a_grid[0]) / (
+                    (1 + ss.ra) * par.a_grid[0] - (1 + ss.ra) * par.A_target)
+            print(f"highest chi possible for no non-linearities in the steady state is {highest_chi}")
+        par.print_non_lin_warning = False
+
 
 def evaluate_ss(model, do_print=False):
     """ find the steady state """
@@ -74,6 +95,12 @@ def evaluate_ss(model, do_print=False):
     ss.K = par.K_Y_ratio * ss.Y
     ss.G = par.G_Y_ratio * ss.Y
     ss.qB = par.qB_Y_ratio * ss.Y
+    ss.A = par.A_Y_ratio * ss.Y
+    assert np.isclose(ss.A / ss.L, par.A_Y_ratio / par.L_Y_ratio)
+
+    par.mu_p = ss.Y / (ss.Y - ss.r * (ss.A + ss.L - ss.qB - ss.K))
+    par.e_p = par.mu_p/(par.mu_p-1)
+    par.e_w = par.e_p
 
     # zero inflation
     ss.Pi = 0.0
@@ -93,19 +120,21 @@ def evaluate_ss(model, do_print=False):
     ss.rl = ss.r - par.xi
     ss.q = 1.0 / (1.0 + ss.r - par.delta_q)
 
-    ss.A = ss.p_eq + ss.qB - ss.L
     ss.B = par.qB_Y_ratio * ss.Y / ss.q
 
     # d. intermediate goods
     ss.rk = ss.r + par.delta_K
     ss.s = (par.e_p - 1) / par.e_p
+    assert np.isclose(ss.s, 1 / par.mu_p)
     par.alpha = ss.rk * ss.K / ss.s
     par.Theta = ss.Y * ss.K ** (-par.alpha) * ss.N ** (par.alpha - 1)
+    assert np.isclose(par.Theta * ss.K ** par.alpha * ss.N ** (1 - par.alpha), ss.Y)
     ss.w = ss.s * (1 - par.alpha) / ss.N
-    ss.Div_int = 1 - 1 / par.mu_p
+    ss.Div_int = (1 - ss.s) * ss.Y
+    assert np.isclose(ss.Div_int, ss.Y - ss.w * ss.N - ss.rk * ss.K)
     ss.p_int = ss.Div_int / ss.r
 
-    assert np.isclose(par.Theta * ss.K ** par.alpha * ss.N ** (1 - par.alpha), ss.Y)
+
 
     # e. capital firms
     ss.Q = 1.0
@@ -118,8 +147,8 @@ def evaluate_ss(model, do_print=False):
     # f. all firms
     ss.Div = ss.Y - ss.w * ss.N - ss.I
     ss.p_eq = ss.Div / ss.r
-    # TODO: delete if not used
-    # ss.p_share = ss.p_eq / ss.A
+
+    ss.A = ss.p_eq + ss.qB - ss.L
 
     assert np.isclose(ss.Div - ss.Div_int - ss.Div_k, 0.0)
 
@@ -132,6 +161,7 @@ def evaluate_ss(model, do_print=False):
     # i. households
     ss.Z = (1 - ss.tau) * ss.w * ss.N
     par.A_target = ss.A
+    assert par.Nfix == 1
 
     model.solve_hh_ss(do_print=do_print)
     model.simulate_hh_ss(do_print=do_print, Dbeg=ss.Dbeg)
@@ -158,6 +188,8 @@ def objective_ss(x, model, do_print=False):
     par.beta_mean = x[0]
     evaluate_ss(model, do_print=do_print)
 
+    # print(f"beta: {par.beta_mean}, clearing_Y: {ss.clearing_Y}")
+
     return ss.clearing_Y
 
 
@@ -171,11 +203,13 @@ def find_ss(model, do_print=False):
     if do_print: print('Find optimal beta for market clearing')
 
     t0 = time.time()
-    res = optimize.root(objective_ss, par.beta_mean, method='hybr', tol=par.tol_ss, args=(model))
+    res = optimize.root(objective_ss, par.beta_mean, method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
+
+    assert res["success"], res["message"]
 
     # b. final evaluation
     if do_print: print('final evaluation')
-    objective_ss(res.x, model, do_print=do_print)
+    objective_ss([par.beta_mean], model, do_print=do_print)
 
     # check targets
     if do_print:
@@ -186,3 +220,36 @@ def find_ss(model, do_print=False):
         print(f'Discrepancy in A = {ss.clearing_A:12.8f}')
         print(f'Discrepancy in L = {ss.clearing_L:12.8f}')
         print(f'Discrepancy in Y = {ss.clearing_Y:12.8f}')
+
+def init_optimized_Dbeg(model, e_ergodic):
+    """ initiate Dbeg that is optimized along the illiquid asset grid """
+
+    par = model.par
+    ss = model.ss
+
+    A_target = ss.A
+
+    # find closest but smaller grid value to target
+    i_a_target = np.abs(par.a_grid - A_target).argmin()  # find grid value which is closest to the target
+    if par.a_grid[i_a_target] > A_target:
+        i_a_target += -1  # select grid value that is smaller than target
+    assert i_a_target <= par.Na, 'illiquid asset target outside of grid'
+    # find weights between grid value and target,
+    # s.t. w*a_grid[i]+(1-w)*a_grid[i+1] = a_target
+    i_a_weight = (A_target - par.a_grid[i_a_target + 1]) / (par.a_grid[i_a_target] - par.a_grid[i_a_target + 1])
+
+    # fill Dbeg
+    Dbeg = np.zeros_like(ss.Dbeg)
+    Dz = np.zeros_like(ss.Dz)
+    for i_fix in range(par.Nfix):
+        Dz[i_fix, :] = e_ergodic / par.Nfix
+        for i_z in range(par.Nz):
+            for i_l in range(par.Nl):
+                # distribute population shares along the relevant grids for the illiquid asset target
+                Dbeg[i_fix, i_z, i_l, i_a_target] = Dz[i_fix, i_z] / par.Nl * i_a_weight
+                Dbeg[i_fix, i_z, i_l, i_a_target + 1] = Dz[i_fix, i_z] / par.Nl * (1 - i_a_weight)
+    # assert
+    Dbeg_sum = np.sum(Dbeg)
+    assert np.isclose(Dbeg_sum, 1.0), f'sum(ss.Dbeg) = {Dbeg_sum:12.8f}, should be 1.0'
+
+    return Dbeg, Dz

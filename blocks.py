@@ -134,7 +134,16 @@ def block_pre(par, ini, ss, path, ncols=1):
         # outputs: i
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
-            i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
+            Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
+            if par.taylor == 'additive':
+                i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
+            elif par.taylor == 'multiplicative':
+                i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** par.rho_m \
+                       * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+            elif par.taylor == 'simple':
+                i[t] = ss.r + par.phi_pi * Pi[t] + em[t]
+            else:
+                print('Taylor rule spec not implemented')
 
         ###
         # d. Finance block
@@ -151,9 +160,10 @@ def block_pre(par, ini, ss, path, ncols=1):
         psi[:] = I * S
 
         Div[:] = Y - w * N - I - psi
-
         Div_k[:] = rk * K - I - psi
-        Div_int[:] = Div - Div_k
+        Div_int[:] = (1 - s) * Y
+        # Div_int[:] = Y - w * N - rk * K
+        assert np.max(Div - Div_int - Div_k) < 1e-10
 
         for t_ in range(par.T):
             t = (par.T - 1) - t_
@@ -177,32 +187,20 @@ def block_pre(par, ini, ss, path, ncols=1):
             p_int_plus = p_int[t + 1] if t < par.T - 1 else ss.p_int
             p_int[t] = (p_int_plus + Div_int_plus) / (1 + r[t])
 
-        # TODO: delete
-        # # ra
-        # A_t = par.A_target
-        # for t in range(par.T):
-        #
-        #     p_eq_lag = p_eq[t-1] if t > 0 else ini.p_eq
-        #     q_lag = q[t-1] if t > 0 else ini.q
-        #     p_share_lag = p_share[t-1] if t > 0 else ini.p_share
-        #
-        #     ra[t] = p_share_lag*(Div[t]+p_eq[t])/p_eq_lag + \
-        #             (1-p_share_lag)*(1+par.delta_q*q[t])/q_lag-1
-        #
-        #     A_t = A_t - (par.chi*((1+ra[t])*A_t-(1+ss.r)*par.A_target))
-        #
-        #     p_share[t] = p_eq[t] / A_t
+        assert np.max(p_eq - p_int - p_k) < 1e-10
 
-        A_lag = ini.A
-        term_L = (1 + rl[0]) * ini.L + par.xi * ini.L
+        A_lag = ini.A_hh
+        term_L = (1 + rl[0]) * ini.L_hh + par.xi * ini.L_hh
         term_B = (1 + par.delta_q * q[0]) * ini.B
         term_eq = p_eq[0] + Div[0]
 
         ra[0] = (term_B + term_eq - term_L) / A_lag - 1
         ra[1:] = r[:-1]
 
-
-        # possibility: test whether eq. (7) holds
+        for t in range(par.T):
+            A_lag = A[t - 1] if t > 0 else ini.A
+            d = ss.ra / (1 + ss.ra) * (1 + ra[t]) * A_lag + par.chi * ((1 + ra[t]) * A_lag - (1 + ss.ra) * par.A_target)
+            A[t] = (1 + ra[t]) * A_lag - d
 
         ###
         # e. Fiscal block
@@ -319,16 +317,3 @@ def block_post(par, ini, ss, path, ncols=1):
         L_hh_lag = lag(ini.L_hh, L_hh)
 
         clearing_Y[:] = Y - (C_hh + G + I + psi + par.xi * L_hh_lag)
-
-        L[:] = L_hh
-        A[:] = p_eq + qB - L
-        clearing_A[:] = A_hh - A
-        clearing_L[:] = L_hh - L
-
-        A_hh_lag = lag(ini.A_hh, A_hh)
-        B_lag = lag(ini.B, B)
-        # clearing at the beginning of the period
-        clearing_fund_start[:] = (1 + ra) * A_hh_lag + (1 + rl) * L_hh_lag - \
-                                 ((1 + par.delta_q * q) * B_lag + (p_eq + Div) - par.xi * L_hh_lag)
-        # clearing at the end of the period
-        clearing_fund_end[:] = p_eq + qB - (A_hh + L_hh)
