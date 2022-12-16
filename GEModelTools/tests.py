@@ -127,6 +127,10 @@ def jacs(model, s_list=None, dx=1e-4):
 
         print('note: differences should only be due to numerical errors\n')
 
+        if model.par.inattention > 0:
+            print(f'household inattention = {model.par.inattention}')
+            print('-> sticky information jacs based on direct method wont be correct')
+
         # a. direct
         print('direct method:')
         model._compute_jac_hh(dx=dx, do_print=True, do_direct=True, s_list=s_list)
@@ -135,6 +139,8 @@ def jacs(model, s_list=None, dx=1e-4):
         # b. fake news
         print(f'\nfake news method:')
         model._compute_jac_hh(dx=dx, do_print=True, do_direct=False)
+        if model.par.inattention > 0:
+            model.jac_hh = model._compute_sticky_jacs_hh(model.jac_hh)
 
         # c. compare
         fig = plt.figure(figsize=(6 * 2, len(model.outputs_hh) * len(model.inputs_hh_all) * 4), dpi=100)
@@ -158,6 +164,82 @@ def jacs(model, s_list=None, dx=1e-4):
 
                     diff = jac_hh_var[:, s] - jac_hh_var_direct[:, s]
                     ax_diff.plot(np.arange(par.T), diff, color=colors[j])
+
+                if i == 0: ax.legend(frameon=True)
+                i += 1
+
+                # d. condition numbers
+        print('')
+        for outputname in model.outputs_hh:
+            Outputname_hh = f'{outputname.upper()}_hh'
+            print(f'{Outputname_hh}:')
+            for inputname in model.inputs_hh_all:
+                cond = np.linalg.cond(model.jac_hh[(Outputname_hh, inputname)])
+                mean = np.mean(model.jac_hh[(Outputname_hh, inputname)])
+                if ~np.all(np.isclose(model.jac_hh[(Outputname_hh, inputname)], 0.0)):
+                    print(f' {inputname:15s}: {cond = :.1e} [{mean = :8.1e}]')
+            print('')
+
+    # e. condition numbers - full Jacobian
+    model._compute_jac(inputs='unknowns', dx=dx, do_print=True)
+    model._compute_jac(inputs='shocks', dx=dx, do_print=True)
+    print('')
+
+    for targetname in model.targets:
+        print(f'{targetname}:')
+        for inputname in model.unknowns + model.shocks:
+            cond = np.linalg.cond(model.jac[(targetname, inputname)])
+            mean = np.mean(model.jac[(targetname, inputname)])
+            if ~np.all(np.isclose(model.jac[(targetname, inputname)], 0.0)):
+                print(f' {inputname:15s}: {cond = :.1e} [{mean = :8.1e}]')
+        print('')
+
+    for jacname in ['H_U', 'H_Z']:
+
+        jac = getattr(model, jacname)
+        cond = np.linalg.cond(jac)
+        mean = np.mean(jac)
+        if ~np.all(np.isclose(jac, 0.0)):
+            print(f'{jacname:15s}: {cond = :.1e} [{mean = :8.1e}]')
+
+    print('')
+
+def jacs_sticky(model, s_list=None, dx=1e-4):
+    """ test the computation of hh Jacobians with direct and fake news method, and the overall Jacobian"""
+
+    par = model.par
+    if s_list is None:
+        s_list = list(np.arange(0, model.par.T, model.par.T // 4))
+
+    if len(model.outputs_hh) > 0:
+
+        print('note: differences should only be due to numerical errors\n')
+
+        if model.par.inattention > 0:
+            print(f'household inattention = {model.par.inattention}')
+            print('-> sticky information jacs based on direct method omitted')
+
+        # a. fake news
+        print(f'\nfake news method:')
+        model._compute_jac_hh(dx=dx, do_print=True, do_direct=False)
+        if model.par.inattention > 0:
+            model.jac_hh = model._compute_sticky_jacs_hh(model.jac_hh)
+
+        # c. plot
+        fig = plt.figure(figsize=(len(model.inputs_hh_all) * 4, len(model.outputs_hh) * 2), dpi=100)
+
+        i = 0
+        for inputname in model.inputs_hh_all:
+            for outputname in model.outputs_hh:
+
+                jac_hh_var = model.jac_hh[(f'{outputname.upper()}_hh', inputname)]
+
+                ax = fig.add_subplot(len(model.inputs_hh_all), len(model.outputs_hh), i + 1)
+
+                ax.set_title(f'{outputname.upper()} to {inputname}')
+
+                for j, s in enumerate(s_list):
+                    ax.plot(np.arange(par.T), jac_hh_var[:, s], color=colors[j], ls='--', label='fake news')
 
                 if i == 0: ax.legend(frameon=True)
                 i += 1

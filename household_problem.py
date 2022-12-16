@@ -6,6 +6,7 @@ import numba as nb
 from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
+# TODO: change input back to only ra
 @nb.njit
 def solve_hh_backwards(par,z_trans,Z,ra,rl,ez,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
@@ -13,6 +14,7 @@ def solve_hh_backwards(par,z_trans,Z,ra,rl,ez,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     # unpack
     A_target = par.A_target
     ra_ss = par.r_ss_target
+
 
     # solve
     for i_fix in range(par.Nfix):

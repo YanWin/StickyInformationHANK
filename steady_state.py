@@ -147,11 +147,9 @@ def evaluate_ss(model, do_print=False):
 
     # f. all firms
     ss.Div = ss.Y - ss.w * ss.N - ss.I
-    ss.p_eq = ss.Div / ss.r
-
-    ss.A = ss.p_eq + ss.qB - ss.L
-
     assert np.isclose(ss.Div - ss.Div_int - ss.Div_k, 0.0)
+    ss.p_eq = ss.Div / ss.r
+    assert np.isclose(ss.A, ss.p_eq + ss.qB - ss.L)
 
     # g. unions
     ss.s_w = (par.e_w - 1) / par.e_w
@@ -164,6 +162,7 @@ def evaluate_ss(model, do_print=False):
     par.A_target = ss.A
     assert par.Nfix == 1
 
+
     model.solve_hh_ss(do_print=do_print)
     model.simulate_hh_ss(do_print=do_print, Dbeg=ss.Dbeg)
 
@@ -171,13 +170,12 @@ def evaluate_ss(model, do_print=False):
     u_prime_e = ss.UCE_hh
     par.nu = ss.s_w * (1 - ss.tau) * ss.w * u_prime_e / v_prime_N_unscaled
 
+
     # j. clearing
-    ss.clearing_Y = ss.Y - (ss.C_hh + ss.G + ss.I + ss.psi + par.xi * ss.L)
+    ss.clearing_Y = ss.Y - (ss.C_hh + ss.G + ss.I + ss.psi + par.xi * ss.L_hh)
     ss.clearing_A = ss.A_hh - ss.A
     ss.clearing_L = ss.L_hh - ss.L
-    ss.clearing_fund_start = (1 + ss.ra) * ss.A + (1 + ss.rl) * ss.L\
-                             - ((1 + par.delta_q * ss.q) * ss.B + (ss.p_eq + ss.Div) - par.xi * ss.L)
-    ss.clearing_fund_end = ss.p_eq + ss.q * ss.B - (ss.A + ss.L)
+
 
 
 def objective_ss(x, model, do_print=False):
@@ -188,8 +186,6 @@ def objective_ss(x, model, do_print=False):
 
     par.beta_mean = x[0]
     evaluate_ss(model, do_print=do_print)
-
-    # print(f"beta: {par.beta_mean}, clearing_Y: {ss.clearing_Y}")
 
     return ss.clearing_Y
 
@@ -218,9 +214,10 @@ def find_ss(model, do_print=False):
         print(f' beta   = {par.beta_mean:6.4}')
         print(f' nu     = {par.nu:6.4f}')
 
-        print(f'Discrepancy in A = {ss.clearing_A:12.8f}')
+        print(f'Discrepancy in C = {ss.clearing_C:12.8f}')
         print(f'Discrepancy in L = {ss.clearing_L:12.8f}')
         print(f'Discrepancy in Y = {ss.clearing_Y:12.8f}')
+
 
 def init_optimized_Dbeg(model, e_ergodic):
     """ initiate Dbeg that is optimized along the illiquid asset grid """
@@ -241,7 +238,7 @@ def init_optimized_Dbeg(model, e_ergodic):
 
     # fill Dbeg
     Dbeg = np.zeros_like(ss.Dbeg)
-    Dz = np.zeros_like(ss.Dz)
+    Dz =  np.zeros_like(ss.Dz)
     for i_fix in range(par.Nfix):
         Dz[i_fix, :] = e_ergodic / par.Nfix
         for i_z in range(par.Nz):
@@ -254,3 +251,4 @@ def init_optimized_Dbeg(model, e_ergodic):
     assert np.isclose(Dbeg_sum, 1.0), f'sum(ss.Dbeg) = {Dbeg_sum:12.8f}, should be 1.0'
 
     return Dbeg, Dz
+

@@ -2,6 +2,7 @@ import numpy as np
 
 from EconModel import EconModelClass
 from GEModelTools import GEModelClass
+from GEModelTools import tests
 
 import steady_state
 import household_problem
@@ -39,10 +40,8 @@ class HANKStickyModelClass(EconModelClass, GEModelClass):
             'B',
             'clearing_A',
             'clearing_L',
+            'clearing_C',
             'clearing_Y',
-            'clearing_Y',
-            'clearing_fund_start',
-            'clearing_fund_end',
             'Div_int',
             'Div_k',
             'Div',
@@ -149,7 +148,43 @@ class HANKStickyModelClass(EconModelClass, GEModelClass):
         par.phi_tau = 0.1  # response of tax rate to debt  # TODO: calibrate (at least sensitivity analysis)
         par.phi_G = 0  # tax financing of government expenditure shock
         maturity = 5.0*4  # Maturity of government debt - quarterly
+        par.sigma_e = 0.50 # std. of e    # McKay et al (2016): sigma_e = 0.017, Sequence-space paper: 0.129
+        # TODO: calibrate to ...
+        par.chi = 0.005  # redistribution share for illiquid assets
+        par.A_target = np.nan  # illiquid asset target
 
+        # c. intermediate good firms
+        par.Theta = np.nan # productivity factor
+        par.alpha = np.nan # capital share
+        par.delta_K = 0.053/4 # depreciation of capital
+
+        # TODO: use other formulation
+        par.mu_p = 1.06
+        # par.mu_p = 1 / (1 - par.r_ss_target * (par.A_Y_ratio + par.L_Y_ratio - par.K_Y_ratio - par.qB_Y_ratio)) # mark-up
+        par.e_p = par.mu_p/(par.mu_p-1)
+        par.xi_p = 0.926 # calvo price stickiness
+        # TODO: calibrate to ...
+        par.v_p = 0.0 # Kimball superelasticity for prices
+
+        # d. capital goods firms
+        # TODO: calibrate to ...
+        par.phi_K = 9.0  # (inverse of the) elasticity of investment
+
+        # e. unions
+        par.xi_w = 0.6 # 0.899 # calvo wage stickiness
+        par.e_w = par.e_p
+        # TODO: calibrate to ...
+        par.v_w = 0.0 # Kimball superelasticity for wages
+
+        # f. central bank
+        par.rho_m = 0.6 # 0.89  # Taylor rule intertia
+        par.phi_pi = 1.5 # Taylor rule coefficient
+
+        # g. government
+
+        par.phi_tau = 0.1 # response of tax rate to debt # TODO: q: 0.1/4
+        par.phi_G = 0.0 # tax financing of government expenditure shock
+        maturity = 5*4 # Maturity of government debt
         par.delta_q = (maturity-1)*(1+par.r_ss_target)/maturity
         par.taylor = 'additive'  # 'multiplicative', 'additive' or 'simple' for different taylor rules
 
@@ -180,6 +215,7 @@ class HANKStickyModelClass(EconModelClass, GEModelClass):
         par.rho_ez = 0.6  # AR(1) coefficient
         par.std_ez = 0.0  # std. of innovation
 
+
         # k. misc.
         par.T = 250  # length of transition path
         par.simT = 100  # length of simulation
@@ -198,6 +234,10 @@ class HANKStickyModelClass(EconModelClass, GEModelClass):
 
         par.print_non_lin_warning = True
 
+        par.start_dbeg_opti = True  # starts with optimal distribution along illiquid asset grid to speed up find_ss
+        assert par.Nfix == 1, "For now, par.start_dbeg_opti = True works only without multiple beta"
+        par.taylor = 'simple'
+
     def allocate(self):
         """ allocate model """
 
@@ -206,6 +246,10 @@ class HANKStickyModelClass(EconModelClass, GEModelClass):
 
         self.allocate_GE()
 
+
     # override steady state functions
     prepare_hh_ss = steady_state.prepare_hh_ss
     find_ss = steady_state.find_ss
+
+    # additional tests
+    test_jacs_sticky = tests.jacs_sticky

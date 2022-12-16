@@ -16,9 +16,6 @@ def block_pre(par, ini, ss, path, ncols=1):
         clearing_A = path.clearing_A[ncol, :]
         clearing_L = path.clearing_L[ncol, :]
         clearing_Y = path.clearing_Y[ncol, :]
-        clearing_Y = path.clearing_Y[ncol, :]
-        clearing_fund_start = path.clearing_fund_start[ncol, :]
-        clearing_fund_end = path.clearing_fund_end[ncol, :]
         Div_int = path.Div_int[ncol, :]
         Div_k = path.Div_k[ncol, :]
         Div = path.Div[ncol, :]
@@ -113,8 +110,6 @@ def block_pre(par, ini, ss, path, ncols=1):
         ###
         # input: s
         # output: Pi
-
-
         for t_ in range(par.T):
             t = (par.T - 1) - t_
             Pi_increase_plus = Pi_increase[t + 1] if t < par.T - 1 else 0
@@ -192,6 +187,7 @@ def block_pre(par, ini, ss, path, ncols=1):
 
         A_lag = ini.A_hh
         term_L = (1 + rl[0]) * ini.L_hh + par.xi * ini.L_hh
+
         term_B = (1 + par.delta_q * q[0]) * ini.B
         term_eq = p_eq[0] + Div[0]
 
@@ -202,6 +198,7 @@ def block_pre(par, ini, ss, path, ncols=1):
             A_lag = A[t - 1] if t > 0 else ini.A
             d = ss.ra / (1 + ss.ra) * (1 + ra[t]) * A_lag + par.chi * ((1 + ra[t]) * A_lag - (1 + ss.ra) * par.A_target)
             A[t] = (1 + ra[t]) * A_lag - d
+
 
         ###
         # e. Fiscal block
@@ -239,9 +236,6 @@ def block_post(par, ini, ss, path, ncols=1):
         clearing_A = path.clearing_A[ncol, :]
         clearing_L = path.clearing_L[ncol, :]
         clearing_Y = path.clearing_Y[ncol, :]
-        clearing_Y = path.clearing_Y[ncol, :]
-        clearing_fund_start = path.clearing_fund_start[ncol, :]
-        clearing_fund_end = path.clearing_fund_end[ncol, :]
         Div_int = path.Div_int[ncol, :]
         Div_k = path.Div_k[ncol, :]
         Div = path.Div[ncol, :]
@@ -319,3 +313,4 @@ def block_post(par, ini, ss, path, ncols=1):
         L_hh_lag = lag(ini.L_hh, L_hh)
 
         clearing_Y[:] = Y - (C_hh + G + I + psi + par.xi * L_hh_lag)
+        clearing_A[:] = A_hh - A
