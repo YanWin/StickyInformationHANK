@@ -98,20 +98,19 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # targets
         r_ss_target_p_a = 0.05
-        # par.r_ss_target = r_ss_target_p_a
-        par.r_ss_target = (1 + r_ss_target_p_a)**(1/4) - 1  # TODO: quarterly: use this
+        par.r_ss_target = (1 + r_ss_target_p_a)**(1/4) - 1  # quarterly
 
-        par.K_Y_ratio = 2.23  # *4  # capital to GDP   # TODO: quarterly 2.23*4
-        par.L_Y_ratio = 0.23  # *4  # liquid assets to GDP # TODO: quarterly 0.23*4
-        par.hh_wealth_Y_ratio = 3.82  # *4  # aggregate household wealth # TODO: quarterly 3.82*4
+        par.K_Y_ratio = 2.23*4  # capital to GDP  - quarterly
+        par.L_Y_ratio = 0.23*4  # liquid assets to GDP - quarterly
+        par.hh_wealth_Y_ratio = 3.82*4  # aggregate household wealth - quarterly
         par.G_Y_ratio = 0.16  # spending-to-GDP
-        par.qB_Y_ratio = 0.42  # *4  # government bonds to GDP # TODO: quarterly 0.42*4
+        par.qB_Y_ratio = 0.42*4  # government bonds to GDP - quarterly
         par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
 
         # a. preferences
-        par.sigma = 1.0  # CRRA coefficient - # TODO: paper: 1.
+        par.sigma = 1.0  # CRRA coefficient
         # TODO: change to new quarterly beta
-        par.beta_mean = 0.98  # 0.97950170  # discount factor, mean, range is [mean-width,mean+width]
+        par.beta_mean = 0.9951   # discount factor, mean, range is [mean-width,mean+width]
         par.beta_delta = 0.00000  # discount factor, width, range is [mean-width,mean+width]
         par.frisch = 0.5  # Frisch elasticity
         par.nu = np.nan   # Disutility from labor
@@ -119,56 +118,51 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
 
         # b. income and saving parameters
         par.rho_e = 0.966  # AR(1) parameter
-        par.sigma_e = 0.5  # 0.5 std. of e # TODO: calibrate ? -> try to increase this
-        # TODO: calibrate
-        par.chi = 0.001  # 0.009  # redistribution share for illiquid assets
+        par.sigma_e = 0.5  # 0.5 std. of e # TODO: calibrate to match MPC?
+        par.chi = 0.0025  # 0.009  # redistribution share for illiquid assets # TODO: calibrate to macth MPC
         par.A_target = np.nan  # illiquid asset target
 
         # c. intermediate good firms
         par.Theta = np.nan  # productivity factor
         par.alpha = np.nan  # capital share
-        par.delta_K = 0.053  # /4  # depreciation of capital   # TODO: quarterly /4
+        par.delta_K = 0.053/4  # depreciation of capital - quarterly
 
-        # par.mu_p = 1.06  # mark-up
         par.mu_p = np.nan
         par.e_p = np.nan
         par.xi_p = 0.926  # calvo price stickiness
-        # TODO: calibrate or use quarterly value
-        par.v_p = 10  # Kimball superelasticity for prices
+        par.v_p = 10*4  # Kimball superelasticity for prices - # TODO: calibrate?
 
         # d. capital goods firms
-        par.phi_K = 9.0  # /4      # (inverse of the) elasticity of investment
+        par.phi_K = 9.0  # (inverse of the) elasticity of investment
 
         # e. unions
         par.xi_w = 0.899  # calvo wage stickiness
         par.e_w = np.nan
-        # TODO: calibrate or use quarterly value
-        par.v_w = 10  # Kimball superelasticity for wages
+        par.v_w = 10*4  # Kimball superelasticity for wages # TODO: calibrate?
 
         # f. central bank
-        par.rho_m = 0.89  # 0.89  # Taylor rule intertia    # TODO: this is quarterly
-        par.phi_pi = 1.5  # Taylor rule coefficient # TODO: quarterly?
+        par.rho_m = 0.89  # Taylor rule intertia    # TODO: estimate?
+        par.phi_pi = 1.25  # Taylor rule coefficient # TODO: estimate?
 
         # g. government
-        par.phi_tau = 0.1  # *4  # /4  # response of tax rate to debt  # TODO: quarterly (0.1/4)
+        par.phi_tau = 0.1  # response of tax rate to debt  # TODO: calibrate (at least sensitivity analysis)
         par.phi_G = 0  # tax financing of government expenditure shock
-        maturity = 5.0  # *4  # Maturity of government debt    # TODO: quarterly (5*4)
+        maturity = 5.0*4  # Maturity of government debt - quarterly
 
         par.delta_q = (maturity-1)*(1+par.r_ss_target)/maturity
-        par.taylor = 'multiplicative'  # 'multiplicative'  # for different taylor rules
+        par.taylor = 'additive'  # 'multiplicative', 'additive' or 'simple' for different taylor rules
 
-        # h. mutal fund
-        xi_p_a = 0.065  # intermedation spread (p.a.) # paper 0.065
-        # par.xi = xi_p_a
-        par.xi = 1+par.r_ss_target-(1+r_ss_target_p_a-xi_p_a)**(1/4) # TODO: quarterly
+        # h. mutual fund
+        xi_p_a = 0.065  # intermediation spread (p.a.)
+        par.xi = 1+par.r_ss_target-(1+r_ss_target_p_a-xi_p_a)**(1/4)  # quarterly
 
         # i. grids
         par.l_min = 0.0  # maximum point in grid for a
-        par.l_max = 10.0  # maximum point in grid for a  # TODO: quarterly (*4)
+        par.l_max = 10.0*3  # maximum point in grid for a  - quarterly
         par.Nl = 100  # number of grid points
 
         par.a_min = 0.0  # maximum point in grid for a
-        par.a_max = 10.0  # maximum point in grid for a  # TODO: quarterly
+        par.a_max = 10.0*3  # maximum point in grid for a - quarterly
         par.Na = 100  # number of grid points
 
         # j. shocks
@@ -178,7 +172,7 @@ class HANKnoStickyModelClass(EconModelClass, GEModelClass):
         par.std_eg = 0.0  # std. of innovation
         # 2. monetary policy
         par.jump_em = 0.00025 # initial jump
-        par.rho_em = 0.6  # AR(1) coefficient   # TODO: quarterly
+        par.rho_em = 0.6  # AR(1) coefficient
         par.std_em = 0.0  # std. of innovation
 
         # k. misc.
