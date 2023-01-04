@@ -8,7 +8,7 @@ from consav.linear_interp import interp_1d
 
 # TODO: change input back to only ra
 @nb.njit
-def solve_hh_backwards(par,z_trans,Z,ra,rl,ez,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
+def solve_hh_backwards(par,z_trans,Z,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
@@ -24,7 +24,6 @@ def solve_hh_backwards(par,z_trans,Z,ra,rl,ez,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
 
             e = par.z_grid[i_z]  # productivity
             Ze = Z*e  # labor income
-            Ze += ez
 
             # ii. inverse foc
             for i_a in range(par.Na):

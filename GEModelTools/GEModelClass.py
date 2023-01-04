@@ -1165,7 +1165,8 @@ class GEModelClass:
             if do_print: print('household Jacobians:')
             self._compute_jac_hh(inputs_hh_all=inputs_hh_all, dx=dx, do_direct=do_direct, do_print=do_print)
             if self.par.inattention > 0.0:
-                print(f'household inattention = {self.par.inattention}')
+                if do_print:
+                    print(f'household inattention = {self.par.inattention}')
                 if do_direct: print('household calculation based on direct method '
                                     '-> sticky information jacs wont be correct')
                 self.jac_hh = self._compute_sticky_jacs_hh(self.jac_hh)

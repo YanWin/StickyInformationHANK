@@ -194,6 +194,7 @@ def block_pre(par, ini, ss, path, ncols=1):
         ra[0] = (term_B + term_eq - term_L) / A_lag - 1
         ra[1:] = r[:-1]
 
+        # agrgegate illiquid assets
         for t in range(par.T):
             A_lag = A[t - 1] if t > 0 else ini.A
             d = ss.ra / (1 + ss.ra) * (1 + ra[t]) * A_lag + par.chi * ((1 + ra[t]) * A_lag - (1 + ss.ra) * par.A_target)
@@ -222,6 +223,7 @@ def block_pre(par, ini, ss, path, ncols=1):
             B[t] = delta_B + B_no_shock
             qB[t] = q[t] * B[t]
             Z[t] = (1 - tau[t]) * w[t] * N[t]
+            Z[t] += ez[t]
 
 
 @nb.njit
