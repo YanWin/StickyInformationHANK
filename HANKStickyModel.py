@@ -3,13 +3,15 @@ import numpy as np
 from EconModel import EconModelClass
 from GEModelTools import GEModelClass
 from GEModelTools import tests
+from HANKStickyAnalyticsClass import HANKStickyAnalyticsClass
 
 import steady_state
 import household_problem
 import blocks
 
-class HANKStickyModelClass(EconModelClass, GEModelClass):
 
+#class HANKStickyModelClass(EconModelClass, GEModelClass, HANKStickyAnalyticsClass):
+class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
     def __init__(self, savefolder='saved', *args, **kwargs):
         EconModelClass.__init__(self, *args, **kwargs)
         self.savefolder = savefolder
@@ -148,7 +150,7 @@ class HANKStickyModelClass(EconModelClass, GEModelClass):
 
         # g. government
         par.phi_tau = 0.1 # response of tax rate to debt # TODO: calibrate (at least sensitivity analysis)
-        par.phi_G = 0.0 # tax financing of government expenditure shock
+        par.phi_G = 0.5 # tax financing of government expenditure shock
         maturity = 5*4 # Maturity of government debt
         par.delta_q = (maturity-1)*(1+par.r_ss_target)/maturity
         par.taylor = 'additive'  # 'multiplicative', 'additive' or 'simple' for different taylor rules

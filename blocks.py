@@ -128,6 +128,7 @@ def block_pre(par, ini, ss, path, ncols=1):
 
         # inputs: Pi
         # outputs: i
+        assert par.taylor in ['additive', 'multiplicative', 'simple', 'linear'], 'Taylor rule not implemented'
         for t in range(par.T):
             i_lag = i[t - 1] if t > 0 else ini.i
             Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
@@ -138,8 +139,12 @@ def block_pre(par, ini, ss, path, ncols=1):
                        * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
             elif par.taylor == 'simple':
                 i[t] = ss.r + par.phi_pi * Pi[t] + em[t]
-            else:
-                print('Taylor rule spec not implemented')
+        if par.taylor == 'linear':  # constant real interest rate
+            for t_ in range(par.T):
+                t = (par.T - 1) - t_
+                Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
+                i[t] = (1 + ss.r) * (1 + Pi_plus) - 1
+
 
         ###
         # d. Finance block
