@@ -50,6 +50,7 @@ def block_pre(par, ini, ss, path, ncols=1):
         s_w = path.s_w[ncol, :]
         s = path.s[ncol, :]
         tau = path.tau[ncol, :]
+        wN = path.wN[ncol, :]
         valuation_res = path.valuation_res[ncol, :]
         w_res = path.w_res[ncol, :]
         w = path.w[ncol, :]
@@ -79,6 +80,7 @@ def block_pre(par, ini, ss, path, ncols=1):
             K[t] = (1 - par.delta_K) * K_lag + I[t]
 
         N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
+        wN[:] = w * N
         s[:] = w * N / Y / (1 - par.alpha)
         rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 
@@ -277,6 +279,7 @@ def block_post(par, ini, ss, path, ncols=1):
         s_w = path.s_w[ncol, :]
         s = path.s[ncol, :]
         tau = path.tau[ncol, :]
+        wN = path.wN[ncol, :]
         valuation_res = path.valuation_res[ncol, :]
         w_res = path.w_res[ncol, :]
         w = path.w[ncol, :]

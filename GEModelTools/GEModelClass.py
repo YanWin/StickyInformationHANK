@@ -1453,7 +1453,7 @@ class GEModelClass:
 
     def show_IRFs(self, varnames,
                   abs_diff=None, lvl_value=None, facs=None, pows=None,
-                  do_shocks=True, do_targets=True, do_linear=False,
+                  do_shocks=True, do_targets=True, do_linear=False, do_non_linear=True,
                   T_max=None, ncols=4, filename=None):
         """ shows IRFS """
 
@@ -1473,12 +1473,13 @@ class GEModelClass:
         show_IRFs(models, labels, varnames,
                   abs_diff=abs_diff, lvl_value=lvl_value, facs=facs, pows=pows,
                   do_shocks=do_shocks, do_targets=do_targets, do_linear=do_linear,
-                  T_max=T_max, ncols=ncols, filename=filename)
+                  do_non_linear=do_non_linear, T_max=T_max, ncols=ncols, filename=filename)
 
     @staticmethod
     def compare_IRFs(models, labels, varnames,
                      abs_diff=None, lvl_value=None, facs=None, pows=None,
                      do_shocks=True, do_targets=True,
+                     do_linear=True, do_non_linear=False,
                      T_max=None, ncols=4, filename=None):
         """ compare IRFs across models """
 
@@ -1498,6 +1499,7 @@ class GEModelClass:
         show_IRFs(models, labels, varnames,
                   abs_diff=abs_diff, lvl_value=lvl_value, facs=facs, pows=pows,
                   do_shocks=do_shocks, do_targets=do_targets,
+                  do_linear=do_linear, do_non_linear=do_non_linear,
                   T_max=T_max, ncols=ncols, filename=filename)
 
     ###############

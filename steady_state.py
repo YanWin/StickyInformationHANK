@@ -131,6 +131,7 @@ def evaluate_ss(model, do_print=False):
     par.Theta = ss.Y * ss.K ** (-par.alpha) * ss.N ** (par.alpha - 1)
     assert np.isclose(par.Theta * ss.K ** par.alpha * ss.N ** (1 - par.alpha), ss.Y)
     ss.w = ss.s * (1 - par.alpha) / ss.N
+    ss.wN = ss.w*ss.N
     ss.Div_int = (1 - ss.s) * ss.Y
     assert np.isclose(ss.Div_int, ss.Y - ss.w * ss.N - ss.rk * ss.K)
     ss.p_int = ss.Div_int / ss.r

@@ -3,7 +3,7 @@ import numpy as np
 from EconModel import EconModelClass
 from GEModelTools import GEModelClass
 from GEModelTools import tests
-from HANKStickyAnalyticsClass import HANKStickyAnalyticsClass
+from HANKStickyAnalytics import HANKStickyAnalyticsClass
 
 import steady_state
 import household_problem
@@ -26,7 +26,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         # b. household
         self.grids_hh = ['l','a']  # grids
         self.pols_hh = ['l','a']  # policy functions
-        self.inputs_hh = ['Z','ra','rl']  # direct inputs
+        self.inputs_hh = ['tau','wN','ez','ra','rl']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
         self.outputs_hh = ['c','l','a','uce']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
@@ -78,6 +78,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             's_w',
             's',
             'tau',
+            'wN',
             'valuation_res',
             'w_res',
             'w',
