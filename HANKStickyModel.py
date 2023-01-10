@@ -33,6 +33,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         # c. GE
         self.shocks = ['eg','em','ez']  # exogenous shocks
+        # self.shocks = ['eg','em','ez','eg_direct','eg_distribution','eg_debt']  # exogenous shocks
         self.unknowns = ['r','w','Y','Ip','Q']  # endogenous unknowns
         self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res']  # targets = 0
 
@@ -48,6 +49,9 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'Div_k',
             'Div',
             'eg',
+            # 'eg_direct',
+            # 'eg_distribution',
+            # 'eg_debt',
             'ez',
             'em',
             'fisher_res',
@@ -170,7 +174,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.Na = 100  # number of grid points
 
         # j. shocks
-        # 1. fiscal policy
+        # 1. fiscal policy shock
         par.jump_eg = 0.0  # initial jump
         par.rho_eg = 0.0  # AR(1) coefficient
         par.std_eg = 0.0  # std. of innovation
@@ -182,6 +186,10 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.jump_ez = 0.0  # initial jump
         par.rho_ez = 0.6  # AR(1) coefficient
         par.std_ez = 0.0  # std. of innovation
+        # # 4. fiscal policy shocks for decomposition
+        # par.jump_eg = 0.0  # initial jump
+        # par.rho_eg = 0.0  # AR(1) coefficient
+        # par.std_eg = 0.0  # std. of innovation
 
 
         # k. misc.

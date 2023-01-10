@@ -19,16 +19,20 @@ class HANKStickyAnalyticsClass(GEModelClass):
         par = self.par
         jac_hh = self.jac_hh
 
-        if income == 'labor':
+        if income in ['labor', 'tax']:
+            if income == 'labor':
+                inputname = 'wN'
+            elif income == 'tax':
+                inputname = 'tau'
+
             # MPC from labor income
-            assert jac_hh['C_hh', 'Z'].any(), 'Household Jacobian not calculated yet'
+            assert jac_hh[('C_hh', inputname)].any(), 'Household Jacobian not calculated yet'
 
             if annual:
-                mpc = sum([(1/(1+ss.r))**t * jac_hh['C_hh', 'Z'][t, 0] for t in range(4)])
+                mpc = sum([(1/(1+ss.r))**t * jac_hh[('C_hh', inputname)][t, 0] for t in range(4)])
                 # print(f'aggregate annual MPC out of labor income: {mpc:.3f}')
             else:
-                mpc = jac_hh['C_hh', 'Z'][0, 0]
-                # print(f'aggregate MPC out of labor income: {mpc:.3f}')
+                mpc = jac_hh[('C_hh', inputname)][0, 0]
         elif income == 'liquid':
             # for liquid assets
             MPC = np.zeros(ss.D.shape)
@@ -41,7 +45,6 @@ class HANKStickyAnalyticsClass(GEModelClass):
             if annual:
                 mpc = 1 - (1 - mpc) ** 4
             mpc = 1 - (1 - mpc) ** 4
-            # print(f'aggregate  MPC: {mpc:.3f} [annual: {annual}]')
 
         elif income == 'illiquid':
             # for illiquid assets
@@ -55,7 +58,6 @@ class HANKStickyAnalyticsClass(GEModelClass):
             if annual:
                 mpc = 1 - (1 - mpc) ** 4
             mpc = 1 - (1 - mpc) ** 4
-            # print(f'aggregate  MPC: {mpc:.3f} [annual: {annual}]')
         else:
             raise NotImplementedError
 
@@ -66,19 +68,18 @@ class HANKStickyAnalyticsClass(GEModelClass):
 
         ss = self.ss
         par = self.par
-        path = self.path
+        IRF = self.IRF
 
         if cum_FMP_max_T == None:
             cum_FMP_max_T = self.par.T
 
-        assert path.eg.any(), 'No fiscal policy shocks specified'
-        assert ss.Y != 0.0, 'ss.Y == 0 -> divide error in fiscal multiplier'
-        assert ss.G != 0.0, 'ss.G == 0 -> divide error in fiscal multiplier'
+        assert IRF['eg'].any(), 'No fiscal policy shocks specified'
+        assert IRF['G'][0] != 0.0, 't=0, G == 0 -> divide error in fiscal multiplier'
 
-        fmp_impact = (path.Y[0,0] - ss.Y) / (path.G[0,0] - ss.G)
+        fmp_impact = IRF['Y'][0] / IRF['G'][0]
 
-        dY = np.array([(1 + ss.r) ** (-t) * (path.Y[0, t] - ss.Y) for t in range(par.T)])
-        dG = np.array([(1 + ss.r) ** (-t) * (path.G[0, t] - ss.G) for t in range(par.T)])
+        dY = np.array([(1 + ss.r) ** (-t) * IRF['Y'][t] for t in range(par.T)])
+        dG = np.array([(1 + ss.r) ** (-t) * IRF['G'][t] for t in range(par.T)])
 
         fmp_cum = dY[:cum_FMP_max_T].sum() / dG[:cum_FMP_max_T].sum()
 

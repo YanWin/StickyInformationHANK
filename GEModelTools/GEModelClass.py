@@ -1280,7 +1280,7 @@ class GEModelClass:
             dZ[i_shock, :] = path.__dict__[shockname][0, :] - ss.__dict__[shockname]
             self.IRF[shockname][:] = dZ[i_shock, :]
 
-            # unknowns
+        # unknowns
         dU = self.G_U @ dZ.ravel()
         dU = dU.reshape((len(self.unknowns), par.T))
 

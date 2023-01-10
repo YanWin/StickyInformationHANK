@@ -215,7 +215,7 @@ def find_ss(model, do_print=False):
         print(f' beta   = {par.beta_mean:6.4}')
         print(f' nu     = {par.nu:6.4f}')
 
-        print(f'Discrepancy in C = {ss.clearing_C:12.8f}')
+        # print(f'Discrepancy in C = {ss.clearing_C:12.8f}')
         print(f'Discrepancy in L = {ss.clearing_L:12.8f}')
         print(f'Discrepancy in Y = {ss.clearing_Y:12.8f}')
 
