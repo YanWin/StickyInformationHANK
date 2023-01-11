@@ -113,6 +113,10 @@ def evaluate_ss(model, do_print=False):
     ss.em = 0.0
     ss.ez = 0.0
 
+    ss.eg_direct = 0.0
+    ss.eg_distribution = 0.0
+    ss.eg_debt = 0.0
+
     # b. central bank
     ss.i = ss.r
 

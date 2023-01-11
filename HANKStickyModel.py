@@ -32,8 +32,8 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
         # c. GE
-        self.shocks = ['eg','em','ez']  # exogenous shocks
-        # self.shocks = ['eg','em','ez','eg_direct','eg_distribution','eg_debt']  # exogenous shocks
+        # self.shocks = ['eg','em','ez']  # exogenous shocks
+        self.shocks = ['eg','em','ez','eg_direct','eg_distribution','eg_debt']  # exogenous shocks
         self.unknowns = ['r','w','Y','Ip','Q']  # endogenous unknowns
         self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res']  # targets = 0
 
@@ -49,9 +49,9 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'Div_k',
             'Div',
             'eg',
-            # 'eg_direct',
-            # 'eg_distribution',
-            # 'eg_debt',
+            'eg_direct',
+            'eg_distribution',
+            'eg_debt',
             'ez',
             'em',
             'fisher_res',
@@ -155,7 +155,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         # g. government
         par.phi_tau = 0.1 # response of tax rate to debt # TODO: calibrate (at least sensitivity analysis)
-        par.phi_G = 0.5 # tax financing of government expenditure shock
+        par.phi_G = 0.5 # deficit financing of government expenditure shock
         maturity = 5*4 # Maturity of government debt
         par.delta_q = (maturity-1)*(1+par.r_ss_target)/maturity
         par.taylor = 'additive'  # 'multiplicative', 'additive' or 'simple' for different taylor rules
@@ -175,21 +175,33 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         # j. shocks
         # 1. fiscal policy shock
-        par.jump_eg = 0.0  # initial jump
-        par.rho_eg = 0.0  # AR(1) coefficient
+        par.jump_eg = 0.01  # initial jump
+        par.rho_eg = 0.9  # AR(1) coefficient
         par.std_eg = 0.0  # std. of innovation
         # 2. monetary policy
-        par.jump_em = 0.00025 # initial jump
-        par.rho_em = 0.6  # AR(1) coefficient
+        par.jump_em = 0.0 # initial jump
+        par.rho_em = 0.0  # AR(1) coefficient
         par.std_em = 0.0  # std. of innovation
         # 3. persistent income shock
         par.jump_ez = 0.0  # initial jump
         par.rho_ez = 0.6  # AR(1) coefficient
         par.std_ez = 0.0  # std. of innovation
         # # 4. fiscal policy shocks for decomposition
-        # par.jump_eg = 0.0  # initial jump
-        # par.rho_eg = 0.0  # AR(1) coefficient
-        # par.std_eg = 0.0  # std. of innovation
+        # par.decomp_distribution = False
+        # par.decomp_debt = False
+        # par.decomp_direct = False
+        # 4a. direct effect
+        par.jump_eg_direct = par.jump_eg  # initial jump
+        par.rho_eg_direct = par.rho_eg  # AR(1) coefficient
+        par.std_eg_direct = par.std_eg  # std. of innovation
+        # 4b. distributional effect
+        par.jump_eg_distribution = par.jump_eg  # initial jump
+        par.rho_eg_distribution = par.rho_eg  # AR(1) coefficient
+        par.std_eg_distribution = par.std_eg  # std. of innovation
+        # 4c. crowding out effect
+        par.jump_eg_debt = par.jump_eg  # initial jump
+        par.rho_eg_debt = par.rho_eg  # AR(1) coefficient
+        par.std_eg_debt = par.std_eg  # std. of innovation
 
 
         # k. misc.
