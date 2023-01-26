@@ -101,12 +101,15 @@ class HANKStickyAnalyticsClass(GEModelClass):
 
             :return returns the model"""
 
+        name = model.name
+
         if baseline_model == None:
             print("\r" + 'Find steady state  ', end="")
             model.find_ss(do_print=False)
         else:
             print("\r" + f'Use steady state from {baseline_model.name}')
             model = baseline_model.copy()
+            model.name = name
             for p in update_par.keys():
                 model.par.__dict__[p] = update_par[p]
 
@@ -127,14 +130,17 @@ class HANKStickyAnalyticsClass(GEModelClass):
         return model
 
     @staticmethod
-    def get_sticky_IRFs(model, inattention=0.935):
-        """ get sticky information IRFs for list of models"""
-
-        m_sticky = f"{model.name}_sticky"
-
-        print('\r' + f' -------- Model: {m_sticky} ---------')
+    def get_sticky_IRFs(model, inattention=0.935, name=None):
+        """ get sticky information IRFs for model"""
 
         model_sticky = model.copy()
+
+        if name == None:
+            m_sticky = f"{model.name}_sticky"
+        else:
+            m_sticky = name
+
+        print('\r' + f' -------- Model: {m_sticky} ---------')
 
         model_sticky.name = m_sticky
 

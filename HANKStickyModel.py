@@ -26,14 +26,14 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         # b. household
         self.grids_hh = ['l','a']  # grids
         self.pols_hh = ['l','a']  # policy functions
-        self.inputs_hh = ['tau','wN','ez','ra','rl']  # direct inputs
+        self.inputs_hh = ['tau','wN','ra','rl','ez','eg_transfer']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
         self.outputs_hh = ['c','l','a','uce']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
         # c. GE
         # self.shocks = ['eg','em','ez']  # exogenous shocks
-        self.shocks = ['eg','em','ez','eg_direct','eg_distribution','eg_debt']  # exogenous shocks
+        self.shocks = ['eg','em','ez','eg_direct','eg_distribution','eg_debt','eg_transfer']  # exogenous shocks
         self.unknowns = ['r','w','Y','Ip','Q']  # endogenous unknowns
         self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res']  # targets = 0
 
@@ -52,6 +52,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'eg_direct',
             'eg_distribution',
             'eg_debt',
+            'eg_transfer',
             'ez',
             'em',
             'fisher_res',
@@ -202,6 +203,10 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.jump_eg_debt = par.jump_eg  # initial jump
         par.rho_eg_debt = par.rho_eg  # AR(1) coefficient
         par.std_eg_debt = par.std_eg  # std. of innovation
+        # 4d. direct transfers
+        par.jump_eg_transfer = 0.0  # initial jump
+        par.rho_eg_transfer = 0.0  # AR(1) coefficient
+        par.std_eg_transfer = 0.0  # std. of innovation
 
 
         # k. misc.

@@ -23,6 +23,7 @@ def block_pre(par, ini, ss, path, ncols=1):
         eg_direct = path.eg_direct[ncol, :]
         eg_distribution = path.eg_distribution[ncol, :]
         eg_debt = path.eg_debt[ncol, :]
+        eg_transfer = path.eg_transfer[ncol, :]
         em = path.em[ncol, :]
         ez = path.ez[ncol, :]
         fisher_res = path.fisher_res[ncol, :]
@@ -205,11 +206,11 @@ def block_pre(par, ini, ss, path, ncols=1):
         ra[1:] = r[:-1]
 
         # agrgegate illiquid assets
-        for t in range(par.T):
-            A_lag = A[t - 1] if t > 0 else ini.A
-            d = ss.ra / (1 + ss.ra) * (1 + ra[t]) * A_lag + par.chi * ((1 + ra[t]) * A_lag - (1 + ss.ra) * par.A_target)
-            A[t] = (1 + ra[t]) * A_lag - d
-
+        # assert par.Nfix == 1, 'only works if all households have the same target for illiquid assets'
+        # for t in range(par.T):
+        #     A_lag = A[t - 1] if t > 0 else ini.A
+        #     d = ss.ra / (1 + ss.ra) * (1 + ra[t]) * A_lag + par.chi * ((1 + ra[t]) * A_lag - (1 + ss.ra) * par.A_target)
+        #     A[t] = (1 + ra[t]) * A_lag - d
 
         ###
         # e. Fiscal block
@@ -229,40 +230,9 @@ def block_pre(par, ini, ss, path, ncols=1):
             tau[t] = delta_tau + tau_no_shock
             # gov bonds without shock
             B_no_shock = (ss.G + (1 + par.delta_q * q[t]) * B_lag - tau_no_shock * ss.w * ss.N) / ss.q
-            # B_no_shock = (ss.G + (1 + par.delta_q * q[t]) * B_lag - tau_no_shock * w[t] * N[t]) / q[t]
             # changes in B depending on shock and fraction of tax financing
             delta_B = par.phi_G * ss.G * eg_debt[t] / q[t]
             B[t] = delta_B + B_no_shock
-
-
-        # for t in range(par.T):
-        #     B_lag = B[t - 1] if t > 0 else ini.B
-        #
-        #     if par.decomp_distribution:
-        #         G[t] = (1 - par.phi_G) * ss.G * (1 + eg[t])
-        #         tau[t] = G[t] / (1 + (1 - par.phi_G) * eg[t]) / w[t] / N[t]
-        #         B[t] = ss.B
-        #     elif par.decomp_debt:
-        #         G[t] = par.phi_G * ss.G * (1 + eg[t])
-        #         B[t] = (G[t] / (1 + par.phi_G * eg[t]) + (1 + par.delta_q * q[t]) * B_lag) / q[t]
-        #         tau[t] = ss.tau
-        #     elif par.decomp_direct:
-        #         G[t] = ss.G * (1 + eg[t])
-        #         tau[t] = ss.tau
-        #         B[t] = ss.B
-        #     else:
-        #         G[t] = ss.G * (1 + eg[t])
-        #         # tau without fiscal policy shock
-        #         tau_no_shock = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
-        #         # changes of tax rate depending on the shock and fraction of tax financing
-        #         delta_tau = ((1 - par.phi_G) * ss.G * eg[t]) / w[t] / N[t]
-        #         tau[t] = delta_tau + tau_no_shock
-        #         # gov bonds without shock
-        #         B_no_shock = (ss.G + (1 + par.delta_q * q[t]) * B_lag - tau_no_shock * w[t] * N[t]) / q[t]
-        #         # changes in B depending on shock and fraction of tax financing
-        #         delta_B = par.phi_G * ss.G * eg[t] / q[t]
-        #         B[t] = delta_B + B_no_shock
-
 
         qB[:] = q * B
         Z[:] = (1 - tau) * w * N
@@ -288,6 +258,7 @@ def block_post(par, ini, ss, path, ncols=1):
         eg_direct = path.eg_direct[ncol, :]
         eg_distribution = path.eg_distribution[ncol, :]
         eg_debt = path.eg_debt[ncol, :]
+        eg_transfer = path.eg_transfer[ncol, :]
         em = path.em[ncol, :]
         ez = path.ez[ncol, :]
         fisher_res = path.fisher_res[ncol, :]
@@ -345,7 +316,6 @@ def block_post(par, ini, ss, path, ncols=1):
 
             Pi_w_increase[t] = kappa_w * (s_w[t] - (par.e_w - 1) / par.e_w) + par.beta_mean * Pi_w_increase_plus
 
-
         for t in range(par.T):
             Pi_lag = Pi[t - 1] if t > 0 else ss.Pi
             Pi_w[t] = Pi_w_increase[t] + Pi_lag
@@ -359,11 +329,10 @@ def block_post(par, ini, ss, path, ncols=1):
         w_res[:] = np.log(w / w_lag) - (Pi_w- Pi)
 
         # market clearing
-        L_hh_lag = lag(ini.L_hh, L_hh)
+        L[:] = L_hh
+        L_lag = lag(ini.L, L)
 
-        # if par.decomp_distribution or par.decomp_debt:
-        #     clearing_Y[:] = Y - (C_hh + I + psi + par.xi * L_hh_lag)
-        # else:
-        #     clearing_Y[:] = Y - (C_hh + ss.G * (1 + eg) + I + psi + par.xi * L_hh_lag)
-        clearing_Y[:] = Y - (C_hh + ss.G * (1 + eg_direct) + I + psi + par.xi * L_hh_lag)
+        clearing_Y[:] = Y - (C_hh + ss.G * (1 + eg_direct) + I + psi + par.xi * L_lag)
+
+        A[:] = p_eq + qB - L
         clearing_A[:] = A_hh - A

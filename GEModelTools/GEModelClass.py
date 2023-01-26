@@ -1322,7 +1322,7 @@ class GEModelClass:
         else:
             print("no non-linearities in the policy functions")
 
-    def evaluate_path(self, ini='ss', ncols=1, use_jac_hh=True):
+    def evaluate_path(self, ini='ss', ncols=1, use_jac_hh=False):
         """ evaluate transition path """
 
         par = self.par
