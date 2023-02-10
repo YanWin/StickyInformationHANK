@@ -41,6 +41,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         self.varlist = [
             'A',
             'B',
+            'MPC_target',
             'clearing_A',
             'clearing_L',
             'clearing_C',
@@ -108,12 +109,15 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         r_ss_target_p_a = 0.05
         par.r_ss_target = (1 + r_ss_target_p_a)**(1/4) - 1  # quarterly
 
+        par.MPC_target = 0.525
         par.K_Y_ratio = 2.23*4  # capital to GDP  - quarterly
-        par.L_Y_ratio = 0.23*4  # liquid assets to GDP - quarterly
+        # par.L_Y_ratio = 0.23*4  # liquid assets to GDP - quarterly
+        par.L_Y_ratio = np.nan
         par.hh_wealth_Y_ratio = 3.82*4  # aggregate household wealth - quarterly
         par.G_Y_ratio = 0.16  # spending-to-GDP
         par.qB_Y_ratio = 0.42*4  # government bonds to GDP - quarterly
-        par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
+        # par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
+        par.A_Y_ratio = np.nan
         par.A_target = np.nan
         assert par.Nfix == 1
 
@@ -217,10 +221,10 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.max_iter_simulate = 50_000  # maximum number of iterations when simulating household problem
         par.max_iter_broyden = 100  # maximum number of iteration when solving eq. system
 
-        par.tol_ss = 1e-12  # tolerance when finding steady state
-        par.tol_solve = 1e-12  # tolerance when solving household problem
-        par.tol_simulate = 1e-12  # tolerance when simulating household problem
-        par.tol_broyden = 1e-12  # tolerance when solving eq. system
+        par.tol_ss = 1e-11  # tolerance when finding steady state
+        par.tol_solve = 1e-11  # tolerance when solving household problem
+        par.tol_simulate = 1e-11  # tolerance when simulating household problem
+        par.tol_broyden = 1e-11  # tolerance when solving eq. system
 
         par.start_dbeg_opti = True  # starts with optimal distribution along illiquid asset grid to speed up find_ss
         assert par.Nfix == 1, "For now, par.start_dbeg_opti = True works only without multiple beta"

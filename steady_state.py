@@ -7,6 +7,7 @@ from consav.grids import equilogspace
 from consav.markov import log_rouwenhorst
 
 
+
 def prepare_hh_ss(model):
     """ prepare the household block for finding the steady state """
 
@@ -91,14 +92,14 @@ def evaluate_ss(model, do_print=False):
     ss.N = 1.0  # normalization
 
     ss.r = par.r_ss_target
-    ss.L = par.L_Y_ratio * ss.Y
+    # ss.L = par.L_Y_ratio * ss.Y
     ss.K = par.K_Y_ratio * ss.Y
     ss.G = par.G_Y_ratio * ss.Y
     ss.qB = par.qB_Y_ratio * ss.Y
-    ss.A = par.A_Y_ratio * ss.Y
-    assert np.isclose(ss.A / ss.L, par.A_Y_ratio / par.L_Y_ratio)
+    # ss.A = par.A_Y_ratio * ss.Y
+    # assert np.isclose(ss.A / ss.L, par.A_Y_ratio / par.L_Y_ratio)
 
-    par.mu_p = ss.Y / (ss.Y - ss.r * (ss.A + ss.L - ss.qB - ss.K))
+    par.mu_p = ss.Y / (ss.Y - ss.r * (par.hh_wealth_Y_ratio * ss.Y - ss.qB - ss.K))
     par.e_p = par.mu_p/(par.mu_p-1)
     par.e_w = par.e_p
 
@@ -166,16 +167,16 @@ def evaluate_ss(model, do_print=False):
     # i. households
     ss.Z = (1 - ss.tau) * ss.w * ss.N
     par.A_target = ss.A
-    assert par.Nfix == 1
-
+    ss.L = par.hh_wealth_Y_ratio * ss.Y - ss.A
+    assert par.Nfix == 1, NotImplementedError
 
     model.solve_hh_ss(do_print=do_print)
     model.simulate_hh_ss(do_print=do_print, Dbeg=ss.Dbeg)
 
+
     v_prime_N_unscaled = ss.N ** (1 / par.frisch)
     u_prime_e = ss.UCE_hh
     par.nu = ss.s_w * (1 - ss.tau) * ss.w * u_prime_e / v_prime_N_unscaled
-
 
     # j. clearing
     ss.clearing_Y = ss.Y - (ss.C_hh + ss.G + ss.I + ss.psi + par.xi * ss.L_hh)
@@ -191,9 +192,20 @@ def objective_ss(x, model, do_print=False):
     ss = model.ss
 
     par.beta_mean = x[0]
+    ss.A = x[1]
+
+    ss.L = par.hh_wealth_Y_ratio - ss.A
+
     evaluate_ss(model, do_print=do_print)
 
-    return ss.clearing_Y
+    model._compute_jac_hh()
+
+    MPC_annual = model.jac_hh[('C_hh', 'ez')][0, 0:4].sum()
+
+    ss.MPC_target = par.MPC_target - MPC_annual
+
+    return ss.MPC_target, ss.clearing_Y
+    # return ss.clearing_Y
 
 
 def find_ss(model, do_print=False):
@@ -205,14 +217,18 @@ def find_ss(model, do_print=False):
     # a. find steady state
     if do_print: print('Find optimal beta for market clearing')
 
+    L_initial_guess = 0.23*4
+    ss.L = L_initial_guess
+    ss.A = par.hh_wealth_Y_ratio * 1 - ss.L
+
     t0 = time.time()
-    res = optimize.root(objective_ss, par.beta_mean, method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
+    res = optimize.root(objective_ss, np.array([par.beta_mean, ss.A]), method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
 
     assert res["success"], res["message"]
 
     # b. final evaluation
     if do_print: print('final evaluation')
-    objective_ss([par.beta_mean], model, do_print=do_print)
+    objective_ss([par.beta_mean, ss.A], model, do_print=do_print)
 
     # check targets
     if do_print:
@@ -223,6 +239,7 @@ def find_ss(model, do_print=False):
         # print(f'Discrepancy in C = {ss.clearing_C:12.8f}')
         print(f'Discrepancy in L = {ss.clearing_L:12.8f}')
         print(f'Discrepancy in Y = {ss.clearing_Y:12.8f}')
+        print(f'Discrepancy from annual MPC target of {par.MPC_target} = {ss.MPC_target:12.8f}')
 
 
 def init_optimized_Dbeg(model, e_ergodic):
