@@ -11,19 +11,19 @@ def solve_hh_backwards(par,z_trans,tau,wN,ez,eg_transfer,ra,rl,vbeg_l_a_plus,vbe
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
-    A_target = par.A_target
     ra_ss = par.r_ss_target
-
 
     # solve
     for i_fix in range(par.Nfix):
+
+        A_target = par.A_target * par.A_shares[i_fix] / par.Nfix_shares[i_fix]
 
         # a. solution step
         for i_z in range(par.Nz):
 
             e = par.z_grid[i_z]  # productivity
             Z = (1 - tau) * wN + ez
-            Ze = Z*e + eg_transfer # labor income
+            Ze = Z*e + eg_transfer  # labor income
 
             # ii. inverse foc
             for i_a in range(par.Na):

@@ -770,10 +770,12 @@ class GEModelClass:
 
         if do_print: print(f' [computed in {elapsed(t0)}]')
 
-    def _calc_jac_hh_fakenews(self, inputs_hh_all=None, dx=1e-4, do_print=False):
+    def _calc_jac_hh_fakenews(self, inputs_hh_all=None, dx=1e-4, do_print=False, max_s=None, max_T=None):
         """ compute Jacobian of household problem with fake news algorithm """
 
         if inputs_hh_all is None: inputs_hh_all = self.inputs_hh_all
+        if max_s is None: max_s = self.par.T
+        if max_T is None: max_T = self.par.T - 1
 
         with jit(self) as model:
 
@@ -830,7 +832,7 @@ class GEModelClass:
                 for polname in self.outputs_hh:
                     self.dpols[(polname, inputname)] = np.zeros(getattr(path, polname).shape)
 
-                for s in range(par.T):
+                for s in range(max_s):
 
                     # i. solve gradually backwards
                     stepvars_hh = self._get_stepvars_hh_ss(outputs_inplace=False)
@@ -917,7 +919,7 @@ class GEModelClass:
             temp = demean(sol_ss)
             curly_E[outputname][0] = simulate_hh_forwards_exo_transpose(temp, ss.z_trans)
 
-        for t in range(1, par.T - 1):
+        for t in range(1, max_T):
 
             for outputname in self.outputs_hh:
                 temp = simulate_hh_forwards_endo_transpose(curly_E[outputname][t - 1], ss.pol_indices, ss.pol_weights)

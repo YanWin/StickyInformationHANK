@@ -19,7 +19,7 @@ def prepare_hh_ss(model):
     ############
 
     # a. beta
-    par.beta_grid[:] = np.linspace(par.beta_mean - par.beta_delta, par.beta_mean + par.beta_delta, par.Nfix)
+    # par.beta_grid[:] = np.linspace(par.beta_mean - par.beta_delta, par.beta_mean + par.beta_delta, par.Nfix)
 
     # b. a, l
     par.a_grid[:] = equilogspace(par.a_min, par.a_max, par.Na)
@@ -27,7 +27,8 @@ def prepare_hh_ss(model):
 
     # c. e
     sigma = np.sqrt(par.sigma_e ** 2 * (1 - par.rho_e ** 2))
-    par.z_grid[:], ss.z_trans[0, :, :], e_ergodic, _, _ = log_rouwenhorst(par.rho_e, sigma, n=par.Nz)
+    for i_fix in range(par.Nfix):
+        par.z_grid[:], ss.z_trans[i_fix, :, :], e_ergodic, _, _ = log_rouwenhorst(par.rho_e, sigma, n=par.Nz)
 
     #############################################
     # 2. transition matrix initial distribution #
@@ -35,14 +36,18 @@ def prepare_hh_ss(model):
 
     # start with single point distribution for each z
     # start with optimized distribution along a grid (saves 15 sec on my pc)
-    if par.start_dbeg_opti:
+    if par.init_Dbeg == 'opti':
         ss.Dbeg, ss.Dz = init_optimized_Dbeg(model, e_ergodic)
+    elif par.init_Dbeg == 'no_init':
+        pass
     else:
         for i_fix in range(par.Nfix):
-            ss.Dz[i_fix, :] = e_ergodic / par.Nfix
+            ss.Dz[i_fix, :] = e_ergodic * par.Nfix_shares[i_fix]
             for i_z in range(par.Nz):
                 ss.Dbeg[i_fix, i_z, :, :] *= 0.0
                 ss.Dbeg[i_fix, i_z, 0, 0] = ss.Dz[i_fix, i_z]
+    Dbeg_sum = np.sum(ss.Dbeg)
+    assert np.isclose(Dbeg_sum, 1.0), f'sum(ss.Dbeg) = {Dbeg_sum:12.8f},should be 1.0'
 
     ################################################
     # 3. initial guess for intertemporal variables #
@@ -69,15 +74,17 @@ def prepare_hh_ss(model):
     ###############
 
     if par.print_non_lin_warning:
-        lowest_income = (1 + ss.rl) * par.l_grid[0] + ss.Z * par.z_grid[0]
-        highest_redistribution = ss.ra * par.a_grid[0] + par.chi * (
-                    (1 + ss.ra) * par.a_grid[0] - (1 + ss.ra) * par.A_target)
-        if lowest_income + highest_redistribution < 0:
-            print("negative cash-on-hand possible given a/l grids and steady state values "
-                  "-> non-linearities in policy functions")
-            highest_chi = - (lowest_income - ss.ra * par.a_grid[0]) / (
-                    (1 + ss.ra) * par.a_grid[0] - (1 + ss.ra) * par.A_target)
-            print(f"highest chi possible for no non-linearities in the steady state is {highest_chi}")
+        for i_fix in range(par.Nfix):
+            A_target = par.A_target * par.A_shares[i_fix]
+            lowest_income = (1 + ss.rl) * par.l_grid[0] + ss.Z * par.z_grid[0]
+            highest_redistribution = ss.ra * par.a_grid[0] + par.chi * (
+                        (1 + ss.ra) * par.a_grid[0] - (1 + ss.ra) * A_target)
+            if lowest_income + highest_redistribution < 0:
+                print("negative cash-on-hand possible given a/l grids and steady state values "
+                      "-> non-linearities in policy functions")
+                highest_chi = - (lowest_income - ss.ra * par.a_grid[0]) / (
+                        (1 + ss.ra) * par.a_grid[0] - (1 + ss.ra) * A_target)
+                print(f"highest chi possible for no non-linearities in the steady state is {highest_chi}")
         par.print_non_lin_warning = False
 
 
@@ -168,7 +175,6 @@ def evaluate_ss(model, do_print=False):
     ss.Z = (1 - ss.tau) * ss.w * ss.N
     par.A_target = ss.A
     ss.L = par.hh_wealth_Y_ratio * ss.Y - ss.A
-    assert par.Nfix == 1, NotImplementedError
 
     model.solve_hh_ss(do_print=do_print)
     model.simulate_hh_ss(do_print=do_print, Dbeg=ss.Dbeg)
@@ -191,20 +197,34 @@ def objective_ss(x, model, do_print=False):
     par = model.par
     ss = model.ss
 
-    par.beta_mean = x[0]
-    ss.A = x[1]
+    print(x)
 
+    # print(x)
+    par.beta_grid = x[:par.Nfix].tolist()
+    # print(par.beta_grid)
+    par.beta_mean = (np.array(par.beta_grid) * np.array(par.Nfix_shares)).sum()
+
+    ss.A = x[par.Nfix]
     ss.L = par.hh_wealth_Y_ratio - ss.A
 
-    evaluate_ss(model, do_print=do_print)
+    MPC_targets = [var for var in model.varlist if 'MPC_target' in var]
+    assert len(MPC_targets) == par.Nfix, 'Not one MPC_target for each group'
 
-    model._compute_jac_hh()
+    model.prepare_hh_ss()
+    Dbeg_save = model.ss.Dbeg.copy()
+    par.init_Dbeg = 'no_init'
+    for i_fix in range(par.Nfix):
+        model.ss.Dbeg = np.zeros_like(Dbeg_save)
+        model.ss.Dbeg[i_fix] = par.Nfix * Dbeg_save[i_fix]
+        evaluate_ss(model, do_print=do_print)
+        model._compute_jac_hh(inputs_hh_all=['ez'])
+        MPC_annual = model.jac_hh[('C_hh', 'ez')][0, 0:4].sum()
+        ss.__dict__[MPC_targets[i_fix]] = par.MPC_target[i_fix] - MPC_annual
+    if par.Nfix > 1:
+        par.init_Dbeg = 'opti'
+        evaluate_ss(model, do_print=do_print)
 
-    MPC_annual = model.jac_hh[('C_hh', 'ez')][0, 0:4].sum()
-
-    ss.MPC_target = par.MPC_target - MPC_annual
-
-    return ss.MPC_target, ss.clearing_Y
+    return ss.MPC_target_1, ss.MPC_target_2, ss.MPC_target_3, ss.clearing_Y
     # return ss.clearing_Y
 
 
@@ -217,18 +237,21 @@ def find_ss(model, do_print=False):
     # a. find steady state
     if do_print: print('Find optimal beta for market clearing')
 
-    L_initial_guess = 0.23*4
+    L_initial_guess = 0.49162927658706274 # 0.23*4
     ss.L = L_initial_guess
     ss.A = par.hh_wealth_Y_ratio * 1 - ss.L
 
+    init_guess = np.array([par.beta_grid + [ss.A]])
+
     t0 = time.time()
-    res = optimize.root(objective_ss, np.array([par.beta_mean, ss.A]), method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
+    res = optimize.root(objective_ss, init_guess, method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
 
     assert res["success"], res["message"]
 
     # b. final evaluation
     if do_print: print('final evaluation')
-    objective_ss([par.beta_mean, ss.A], model, do_print=do_print)
+    final_input = np.array([par.beta_grid[i_fix] for i_fix in range(par.Nfix)] + [ss.A])
+    objective_ss(final_input, model, do_print=do_print)
 
     # check targets
     if do_print:
@@ -239,7 +262,9 @@ def find_ss(model, do_print=False):
         # print(f'Discrepancy in C = {ss.clearing_C:12.8f}')
         print(f'Discrepancy in L = {ss.clearing_L:12.8f}')
         print(f'Discrepancy in Y = {ss.clearing_Y:12.8f}')
-        print(f'Discrepancy from annual MPC target of {par.MPC_target} = {ss.MPC_target:12.8f}')
+        MPC_targets = [var for var in model.varlist if 'MPC_target' in var]
+        for i_fix in range(par.Nfix):
+            print(f'Discrepancy from annual MPC target of {par.MPC_target} for group {i_fix} ={MPC_targets[i_fix]:12.8f}')
 
 
 def init_optimized_Dbeg(model, e_ergodic):
@@ -248,16 +273,26 @@ def init_optimized_Dbeg(model, e_ergodic):
     par = model.par
     ss = model.ss
 
-    A_target = ss.A
+    A_targets = ss.A * np.array(par.A_shares)
 
-    # find closest but smaller grid value to target
-    i_a_target = np.abs(par.a_grid - A_target).argmin()  # find grid value which is closest to the target
-    if par.a_grid[i_a_target] > A_target:
-        i_a_target += -1  # select grid value that is smaller than target
-    assert i_a_target <= par.Na, 'illiquid asset target outside of grid'
-    # find weights between grid value and target,
-    # s.t. w*a_grid[i]+(1-w)*a_grid[i+1] = a_target
-    i_a_weight = (A_target - par.a_grid[i_a_target + 1]) / (par.a_grid[i_a_target] - par.a_grid[i_a_target + 1])
+    # init Dbeg
+    Dbeg = np.zeros_like(ss.Dbeg)
+    Dz = np.zeros_like(ss.Dz)
+
+    for i_fix in range(par.Nfix):
+
+        Dz[i_fix, :] = e_ergodic * par.Nfix_shares[i_fix]
+
+        A_target = par.A_target * par.A_shares[i_fix] / par.Nfix_shares[i_fix]
+
+        # find closest but smaller grid value to target
+        i_a_target = np.abs(par.a_grid - A_target).argmin()  # find grid value which is closest to the target
+        if par.a_grid[i_a_target] > A_target:
+            i_a_target += -1  # select grid value that is smaller than target
+        assert i_a_target <= par.Na, 'illiquid asset target outside of grid'
+        # find weights between grid value and target,
+        # s.t. w*a_grid[i]+(1-w)*a_grid[i+1] = a_target
+        i_a_weight = (A_target - par.a_grid[i_a_target + 1]) / (par.a_grid[i_a_target] - par.a_grid[i_a_target + 1])
 
     # fill Dbeg
     Dbeg = np.zeros_like(ss.Dbeg)
@@ -269,9 +304,8 @@ def init_optimized_Dbeg(model, e_ergodic):
                 # distribute population shares along the relevant grids for the illiquid asset target
                 Dbeg[i_fix, i_z, i_l, i_a_target] = Dz[i_fix, i_z] / par.Nl * i_a_weight
                 Dbeg[i_fix, i_z, i_l, i_a_target + 1] = Dz[i_fix, i_z] / par.Nl * (1 - i_a_weight)
-    # assert
-    Dbeg_sum = np.sum(Dbeg)
-    assert np.isclose(Dbeg_sum, 1.0), f'sum(ss.Dbeg) = {Dbeg_sum:12.8f}, should be 1.0'
+
+    assert np.isclose(np.sum(Dbeg), 1.0), f'sum(ss.Dbeg) = {np.sum(Dbeg):12.8f}, should be 1.0'
 
     return Dbeg, Dz
 

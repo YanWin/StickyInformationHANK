@@ -41,7 +41,9 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         self.varlist = [
             'A',
             'B',
-            'MPC_target',
+            'MPC_target_1',
+            'MPC_target_2',
+            'MPC_target_3',
             'clearing_A',
             'clearing_L',
             'clearing_C',
@@ -102,14 +104,17 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         par = self.par
 
-        par.Nfix = 1  # number of fixed discrete states (here discount factor)
+        par.Nfix = 3  # number of fixed discrete states (here discount factor)
+        # par.Nfix_shares = [0.5, 0.4, 0.1]  # population shares for discrete states
+        par.Nfix_shares = [1/3, 1/3, 1/3]
+        assert par.Nfix == len(par.Nfix_shares)
+        assert np.sum(par.Nfix_shares) == 1.0
         par.Nz = 7  # number of stochastic discrete states (here productivity)
 
         # targets
         r_ss_target_p_a = 0.05
         par.r_ss_target = (1 + r_ss_target_p_a)**(1/4) - 1  # quarterly
 
-        par.MPC_target = 0.525
         par.K_Y_ratio = 2.23*4  # capital to GDP  - quarterly
         # par.L_Y_ratio = 0.23*4  # liquid assets to GDP - quarterly
         par.L_Y_ratio = np.nan
@@ -118,13 +123,20 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.qB_Y_ratio = 0.42*4  # government bonds to GDP - quarterly
         # par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
         par.A_Y_ratio = np.nan
+        # par.A_shares = [0.027, 0.27, 0.703]
+        par.A_shares = par.Nfix_shares = [1/3, 1/3, 1/3]
+        assert par.Nfix == len(par.A_shares)
+        assert np.sum(par.A_shares) == 1.0
         par.A_target = np.nan
-        assert par.Nfix == 1
+        par.MPC_target = [0.525 for i_fix in range(par.Nfix)]
 
         # a. preferences
         par.sigma = 1.0  # CRRA coefficient
         # TODO: change to new quarterly beta
-        par.beta_mean = 0.9951   # discount factor, mean, range is [mean-width,mean+width]
+        # par.beta_mean = 0.9923   # discount factor, mean, range is [mean-width,mean+width]
+        par.beta_mean = np.nan
+        par.beta_grid = [0.9923167554351788 for i_fix in range(par.Nfix)]
+        # par.beta_grid = [0.99, 0.99, 0.99]
         par.beta_delta = 0.00000  # discount factor, width, range is [mean-width,mean+width]
         par.frisch = 0.5  # Frisch elasticity
         par.nu = np.nan   # Disutility from labor
@@ -226,8 +238,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.tol_simulate = 1e-11  # tolerance when simulating household problem
         par.tol_broyden = 1e-11  # tolerance when solving eq. system
 
-        par.start_dbeg_opti = True  # starts with optimal distribution along illiquid asset grid to speed up find_ss
-        assert par.Nfix == 1, "For now, par.start_dbeg_opti = True works only without multiple beta"
+        par.init_Dbeg = 'opti'  # starts with optimal distribution along illiquid asset grid to speed up find_ss
 
         par.print_non_lin_warning = True
 
@@ -235,8 +246,8 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
     def allocate(self):
         """ allocate model """
 
-        par = self.par
-        par.beta_grid = np.zeros(par.Nfix)
+        # par = self.par
+        # par.beta_grid = np.zeros(par.Nfix)
 
         self.allocate_GE()
 
