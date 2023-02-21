@@ -42,10 +42,12 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'A',
             'B',
             'MPC_target',
+            'hh_wealth',
             'clearing_A',
             'clearing_L',
             'clearing_C',
             'clearing_Y',
+            'clearing_wealth',
             'Div_int',
             'Div_k',
             'Div',
@@ -112,12 +114,13 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.MPC_target = 0.525
         par.K_Y_ratio = 2.23*4  # capital to GDP  - quarterly
         # par.L_Y_ratio = 0.23*4  # liquid assets to GDP - quarterly
-        par.L_Y_ratio = np.nan
+        # par.L_Y_ratio = np.nan
         par.hh_wealth_Y_ratio = 3.82*4  # aggregate household wealth - quarterly
+        par.A_L_ratio = 0.85
         par.G_Y_ratio = 0.16  # spending-to-GDP
         par.qB_Y_ratio = 0.42*4  # government bonds to GDP - quarterly
         # par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
-        par.A_Y_ratio = np.nan
+        # par.A_Y_ratio = np.nan
         par.A_target = np.nan
         assert par.Nfix == 1
 
@@ -144,15 +147,15 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.mu_p = np.nan
         par.e_p = np.nan
         par.xi_p = 0.926  # calvo price stickiness
-        par.v_p = 10*2  # Kimball superelasticity for prices - # TODO: calibrate?
+        par.v_p = 10 # *2  # Kimball superelasticity for prices - # TODO: calibrate?
 
         # d. capital goods firms
-        par.phi_K = 3.0  # 9.0 (inverse of the) elasticity of investment    # TODO: calibrate
+        par.phi_K = 9.0  # 3.0 (inverse of the) elasticity of investment    # TODO: calibrate
 
         # e. unions
-        par.xi_w = 0.899  # calvo wage stickiness
+        par.xi_w = 0.899 #0.899  # calvo wage stickiness
         par.e_w = np.nan
-        par.v_w = 10*2  # Kimball superelasticity for wages # TODO: calibrate?
+        par.v_w = 10 # *2  # Kimball superelasticity for wages # TODO: calibrate?
 
         # f. central bank
         par.rho_m = 0.89  # Taylor rule intertia    # TODO: estimate?
@@ -214,7 +217,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
 
         # k. misc.
-        par.T = 250  # length of transition path
+        par.T = 350  # length of transition path
         par.simT = 100  # length of simulation
 
         par.max_iter_solve = 50_000  # maximum number of iterations when solving household problem

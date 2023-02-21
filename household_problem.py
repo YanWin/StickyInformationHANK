@@ -23,7 +23,7 @@ def solve_hh_backwards(par,z_trans,tau,wN,ez,eg_transfer,ra,rl,vbeg_l_a_plus,vbe
 
             e = par.z_grid[i_z]  # productivity
             Z = (1 - tau) * wN + ez
-            Ze = Z*e + eg_transfer # labor income
+            Ze = Z*e + eg_transfer  # labor income
 
             # ii. inverse foc
             for i_a in range(par.Na):

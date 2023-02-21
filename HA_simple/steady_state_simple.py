@@ -62,14 +62,19 @@ def evaluate_ss(model, do_print=False):
     ss = model.ss
 
     ss.y = par.Z_target
+    ss.r = par.r_ss_target
     ss.rl = par.r_ss_target - par.xi
+    ss.ey = 0.0
 
     model.solve_hh_ss(do_print=do_print)
     model.simulate_hh_ss(do_print=do_print, Dbeg=ss.Dbeg)
 
     model._compute_jac_hh()
 
-    MPC_1_year = model.jac_hh[('C_hh', 'y')][0, 0:4].sum()
+    # MPC_1_year = model.jac_hh[('C_hh', 'y')][0, 0:4].sum()
+    # MPC_1_year = model.jac_hh[('C_hh', 'ey')][0, 0:4].sum()
+    MPC_1_year = np.sum([model.jac_hh[('C_hh', 'ey')][i, 0] / (1 + ss.r) ** i for i in range(4)])
+
     # MPCs_model = [model.jac_hh[('C_hh', 'y')][0, (t * 4):(t * 4) + 4].sum() for t in [0, 1, 2, 3, 4, 5]]
 
     # j. clearing

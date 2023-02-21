@@ -120,9 +120,12 @@ def block_pre(par, ini, ss, path, ncols=1):
             t = (par.T - 1) - t_
             Pi_increase_plus = Pi_increase[t + 1] if t < par.T - 1 else 0
 
-            kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + r[t])) / par.xi_p \
+            # kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + r[t])) / par.xi_p \
+            #         * par.e_p / (par.v_p + par.e_p - 1)
+            # Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + r[t])) * Pi_increase_plus
+            kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + ss.r)) / par.xi_p \
                     * par.e_p / (par.v_p + par.e_p - 1)
-            Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + r[t])) * Pi_increase_plus
+            Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + ss.r)) * Pi_increase_plus
 
         for t in range(par.T):
             Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
@@ -139,10 +142,10 @@ def block_pre(par, ini, ss, path, ncols=1):
             i_lag = i[t - 1] if t > 0 else ini.i
             Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
             if par.taylor == 'additive':
-                i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
+                i[t] = par.rho_m * i_lag + (1.0 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
             elif par.taylor == 'multiplicative':
-                i[t] = (1 + ss.r) ** (1 - par.rho_m) * (1 + i_lag) ** par.rho_m \
-                       * (1 + Pi[t]) ** ((1 - par.rho_m) * par.phi_pi) * (1 + em[t]) - 1
+                i[t] = (1.0 + ss.r) ** (1.0 - par.rho_m) * (1.0 + i_lag) ** par.rho_m \
+                       * (np.exp(Pi_lag)) ** ((1.0 - par.rho_m) * par.phi_pi) * (1.0 + em[t]) - 1.0
             elif par.taylor == 'simple':
                 i[t] = ss.r + par.phi_pi * Pi[t] + em[t]
         if par.taylor == 'linear':  # constant real interest rate
@@ -150,6 +153,7 @@ def block_pre(par, ini, ss, path, ncols=1):
                 t = (par.T - 1) - t_
                 Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
                 i[t] = (1 + ss.r) * (1 + Pi_plus) - 1
+
 
 
         ###
@@ -205,13 +209,6 @@ def block_pre(par, ini, ss, path, ncols=1):
         ra[0] = (term_B + term_eq - term_L) / A_lag - 1
         ra[1:] = r[:-1]
 
-        # agrgegate illiquid assets
-        # assert par.Nfix == 1, 'only works if all households have the same target for illiquid assets'
-        # for t in range(par.T):
-        #     A_lag = A[t - 1] if t > 0 else ini.A
-        #     d = ss.ra / (1 + ss.ra) * (1 + ra[t]) * A_lag + par.chi * ((1 + ra[t]) * A_lag - (1 + ss.ra) * par.A_target)
-        #     A[t] = (1 + ra[t]) * A_lag - d
-
         ###
         # e. Fiscal block
         ###
@@ -219,17 +216,16 @@ def block_pre(par, ini, ss, path, ncols=1):
         # Inputs: q, w, eg
         # Outputs: tau, Z, G
 
-        # G[:] = ss.G + (par.phi_G * eg_debt) + (1 - par.phi_G) * eg_distribution
-        G[:] = ss.G * (1 + eg)
+        G[:] = ss.G * (1.0 + eg)
         for t in range(par.T):
             B_lag = B[t - 1] if t > 0 else ini.B
             # tau without fiscal policy shock
             tau_no_shock = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
             # changes of tax rate depending on the shock and fraction of tax financing
-            delta_tau = ((1 - par.phi_G) * ss.G * eg_distribution[t]) / w[t] / N[t]
+            delta_tau = ((1.0 - par.phi_G) * ss.G * eg_distribution[t]) / w[t] / N[t]
             tau[t] = delta_tau + tau_no_shock
             # gov bonds without shock
-            B_no_shock = (ss.G + (1 + par.delta_q * q[t]) * B_lag - tau_no_shock * ss.w * ss.N) / ss.q
+            B_no_shock = (ss.G + (1.0 + par.delta_q * q[t]) * B_lag - tau_no_shock * ss.w * ss.N) / ss.q
             # changes in B depending on shock and fraction of tax financing
             delta_B = par.phi_G * ss.G * eg_debt[t] / q[t]
             B[t] = delta_B + B_no_shock
@@ -326,13 +322,13 @@ def block_post(par, ini, ss, path, ncols=1):
 
         # wage residual (approximate)
         w_lag = lag(ini.w, w)
-        w_res[:] = np.log(w / w_lag) - (Pi_w- Pi)
+        w_res[:] = np.log(w / w_lag) - (Pi_w - Pi)
 
         # market clearing
         L[:] = L_hh
         L_lag = lag(ini.L, L)
 
-        clearing_Y[:] = Y - (C_hh + ss.G * (1 + eg_direct) + I + psi + par.xi * L_lag)
+        clearing_Y[:] = Y - (C_hh + ss.G * (1.0 + eg_direct) + I + psi + par.xi * L_lag)
 
         A[:] = p_eq + qB - L
         clearing_A[:] = A_hh - A

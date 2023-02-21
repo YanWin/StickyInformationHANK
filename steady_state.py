@@ -91,14 +91,17 @@ def evaluate_ss(model, do_print=False):
     ss.Y = 1.0  # normalization
     ss.N = 1.0  # normalization
 
+    ss.A = par.hh_wealth_Y_ratio * ss.Y * par.A_L_ratio
+    ss.L = par.hh_wealth_Y_ratio * ss.Y * (1.0 - par.A_L_ratio)
+
     ss.r = par.r_ss_target
-    # ss.L = par.L_Y_ratio * ss.Y
+
     ss.K = par.K_Y_ratio * ss.Y
     ss.G = par.G_Y_ratio * ss.Y
     ss.qB = par.qB_Y_ratio * ss.Y
-    # ss.A = par.A_Y_ratio * ss.Y
     # assert np.isclose(ss.A / ss.L, par.A_Y_ratio / par.L_Y_ratio)
 
+    # par.mu_p = ss.Y / (ss.Y - ss.r * (ss.hh_wealth * ss.Y - ss.qB - ss.K))
     par.mu_p = ss.Y / (ss.Y - ss.r * (par.hh_wealth_Y_ratio * ss.Y - ss.qB - ss.K))
     par.e_p = par.mu_p/(par.mu_p-1)
     par.e_w = par.e_p
@@ -142,8 +145,6 @@ def evaluate_ss(model, do_print=False):
     assert np.isclose(ss.Div_int, ss.Y - ss.w * ss.N - ss.rk * ss.K)
     ss.p_int = ss.Div_int / ss.r
 
-
-
     # e. capital firms
     ss.Q = 1.0
     ss.psi = 0.0
@@ -167,7 +168,6 @@ def evaluate_ss(model, do_print=False):
     # i. households
     ss.Z = (1 - ss.tau) * ss.w * ss.N
     par.A_target = ss.A
-    ss.L = par.hh_wealth_Y_ratio * ss.Y - ss.A
     assert par.Nfix == 1, NotImplementedError
 
     model.solve_hh_ss(do_print=do_print)
@@ -182,6 +182,7 @@ def evaluate_ss(model, do_print=False):
     ss.clearing_Y = ss.Y - (ss.C_hh + ss.G + ss.I + ss.psi + par.xi * ss.L_hh)
     ss.clearing_A = ss.A_hh - ss.A
     ss.clearing_L = ss.L_hh - ss.L
+    ss.clearing_wealth = ss.A + ss.L - (ss.L_hh + ss.A_hh)
 
 
 
@@ -192,20 +193,20 @@ def objective_ss(x, model, do_print=False):
     ss = model.ss
 
     par.beta_mean = x[0]
-    ss.A = x[1]
-
-    ss.L = par.hh_wealth_Y_ratio - ss.A
+    par.sigma_e = x[1]
+    # par.hh_wealth_Y_ratio = x[1]
+    par.A_L_ratio = x[2]
 
     evaluate_ss(model, do_print=do_print)
 
     model._compute_jac_hh()
 
-    MPC_annual = model.jac_hh[('C_hh', 'ez')][0, 0:4].sum()
+    # MPC_annual = model.jac_hh[('C_hh', 'ez')][0, 0:4].sum()
+    MPC_annual = np.sum([model.jac_hh[('C_hh', 'eg_transfer')][i, 0] / (1 + ss.r) ** i for i in range(4)])
 
     ss.MPC_target = par.MPC_target - MPC_annual
 
-    return ss.MPC_target, ss.clearing_Y
-    # return ss.clearing_Y
+    return ss.MPC_target, ss.clearing_Y, ss.clearing_wealth
 
 
 def find_ss(model, do_print=False):
@@ -217,18 +218,14 @@ def find_ss(model, do_print=False):
     # a. find steady state
     if do_print: print('Find optimal beta for market clearing')
 
-    L_initial_guess = 0.23*4
-    ss.L = L_initial_guess
-    ss.A = par.hh_wealth_Y_ratio * 1 - ss.L
-
     t0 = time.time()
-    res = optimize.root(objective_ss, np.array([par.beta_mean, ss.A]), method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
+    res = optimize.root(objective_ss, np.array([par.beta_mean, par.sigma_e, par.A_L_ratio]), method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
 
     assert res["success"], res["message"]
 
     # b. final evaluation
     if do_print: print('final evaluation')
-    objective_ss([par.beta_mean, ss.A], model, do_print=do_print)
+    objective_ss([par.beta_mean, par.sigma_e, par.A_L_ratio], model, do_print=do_print)
 
     # check targets
     if do_print:
@@ -239,6 +236,7 @@ def find_ss(model, do_print=False):
         # print(f'Discrepancy in C = {ss.clearing_C:12.8f}')
         print(f'Discrepancy in L = {ss.clearing_L:12.8f}')
         print(f'Discrepancy in Y = {ss.clearing_Y:12.8f}')
+        print(f'Discrepancy in hh wealth = {ss.clearing_wealth:12.8f}')
         print(f'Discrepancy from annual MPC target of {par.MPC_target} = {ss.MPC_target:12.8f}')
 
 

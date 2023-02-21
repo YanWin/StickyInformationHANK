@@ -24,14 +24,14 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
         # b. household
         self.grids_hh = ['l']  # grids
         self.pols_hh = ['l']  # policy functions
-        self.inputs_hh = ['y','rl']  # direct inputs
+        self.inputs_hh = ['y','rl','ey']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
         self.outputs_hh = ['c','l']  # outputs
         self.intertemps_hh = ['vbeg_l']  # intertemporal variables
 
         # c. GE
         # self.shocks = ['eg','em','ez']  # exogenous shocks
-        self.shocks = []  # exogenous shocks
+        self.shocks = ['ey']  # exogenous shocks
         self.unknowns = []  # endogenous unknowns
         self.targets = []  # targets = 0
 
@@ -39,7 +39,9 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
         self.varlist = [
             'y',
             'rl',
-            'MPC_match'
+            'r',
+            'MPC_match',
+            'ey'
             ]
 
         # e. functions
@@ -87,9 +89,9 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
 
         # j. shocks
         # 3. persistent income shock
-        par.jump_ez = 0.0  # initial jump
-        par.rho_ez = 0.6  # AR(1) coefficient
-        par.std_ez = 0.0  # std. of innovation
+        par.jump_ey = 0.0  # initial jump
+        par.rho_ey = 0.0  # AR(1) coefficient
+        par.std_ey = 0.0  # std. of innovation
 
         # k. misc.
         par.T = 250  # length of transition path
