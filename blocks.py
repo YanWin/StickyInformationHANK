@@ -94,7 +94,6 @@ def block_pre(par, ini, ss, path, ncols=1):
             Q_plus = Q[t + 1] if t < par.T - 1 else ss.Q
             r_plus = r[t + 1] if t < par.T - 1 else ss.r
             rk_plus2 = rk[t + 2] if t < par.T - 2 else ss.rk
-
             Q_t = 1.0 / (1.0 + r_plus) * (rk_plus2 + (1.0 - par.delta_K) * Q_plus)
             valuation_res[t] = Q_t - Q[t]
 

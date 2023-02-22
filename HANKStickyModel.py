@@ -34,8 +34,8 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         # c. GE
         # self.shocks = ['eg','em','ez']  # exogenous shocks
         self.shocks = ['eg','em','ez','eg_direct','eg_distribution','eg_debt','eg_transfer']  # exogenous shocks
-        self.unknowns = ['r','w','Y','Ip','Q']  # endogenous unknowns
-        self.targets = ['fisher_res','w_res','clearing_Y','invest_res','valuation_res']  # targets = 0
+        self.unknowns = ['r','w','Y','Ip','rk']  # endogenous unknowns
+        self.targets = ['fisher_res','w_res','clearing_Y','invest_res','clearing_K']  # targets = 0
 
         # d. all variables
         self.varlist = [
@@ -47,6 +47,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'clearing_L',
             'clearing_C',
             'clearing_Y',
+            'clearing_K',
             'clearing_wealth',
             'Div_int',
             'Div_k',
@@ -65,6 +66,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'invest_res',
             'Ip',
             'K',
+            'Kd',
             'L',
             'N',
             'p_eq',

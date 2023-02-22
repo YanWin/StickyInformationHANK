@@ -193,9 +193,8 @@ def objective_ss(x, model, do_print=False):
     ss = model.ss
 
     par.beta_mean = x[0]
-    par.sigma_e = x[1]
-    # par.hh_wealth_Y_ratio = x[1]
-    par.A_L_ratio = x[2]
+    # par.sigma_e = x[1]
+    par.A_L_ratio = x[1]
 
     evaluate_ss(model, do_print=do_print)
 
@@ -206,7 +205,8 @@ def objective_ss(x, model, do_print=False):
 
     ss.MPC_target = par.MPC_target - MPC_annual
 
-    return ss.MPC_target, ss.clearing_Y, ss.clearing_wealth
+    # return ss.MPC_target, ss.clearing_Y, ss.clearing_wealth
+    return ss.clearing_Y, ss.clearing_wealth
 
 
 def find_ss(model, do_print=False):
@@ -219,13 +219,16 @@ def find_ss(model, do_print=False):
     if do_print: print('Find optimal beta for market clearing')
 
     t0 = time.time()
-    res = optimize.root(objective_ss, np.array([par.beta_mean, par.sigma_e, par.A_L_ratio]), method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
+    # res = optimize.root(objective_ss, np.array([par.beta_mean, par.sigma_e, par.A_L_ratio]), method='hybr', tol=par.tol_ss, args=(model))   # method: hybr
+    res = optimize.root(objective_ss, np.array([par.beta_mean, par.A_L_ratio]), method='hybr',
+                        tol=par.tol_ss, args=(model))  # method: hybr
 
     assert res["success"], res["message"]
 
     # b. final evaluation
     if do_print: print('final evaluation')
-    objective_ss([par.beta_mean, par.sigma_e, par.A_L_ratio], model, do_print=do_print)
+    # objective_ss([par.beta_mean, par.sigma_e, par.A_L_ratio], model, do_print=do_print)
+    objective_ss([par.beta_mean, par.A_L_ratio], model, do_print=do_print)
 
     # check targets
     if do_print:
