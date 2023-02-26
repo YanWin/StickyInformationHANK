@@ -11,6 +11,29 @@ from GEModelTools.GEModelClass import GEModelClass
 
 class HANKStickyAnalyticsClass(GEModelClass):
 
+    def check_non_lin(self, p):
+
+        par = self.par
+        ss = self.ss
+        path = self.path
+
+        non_lin = False
+
+        for t in range(par.T):
+            D_agg = path.D[0].sum(axis=(0,1,2))     # aggregate mass on illiquid asset grid
+            i_a_pos = np.argwhere(D_agg > 1e-10)    # find indices with positive mass on illiquid asset grid
+            for i_a in i_a_pos:
+                lowest_income = (1 + path.rl[p,t]) * par.l_grid[0] + path.Z[p,t] * par.z_grid[0]
+                highest_redistribution = ss.ra / (1 + ss.ra) * (1 + path.ra[p,t]) * par.a_grid[i_a] + par.chi * (
+                        (1 + path.ra[p,t]) * par.a_grid[i_a] - (1 + ss.ra) * par.A_target)
+                if lowest_income + highest_redistribution < 0:
+                    non_lin = True
+        if non_lin:
+            print("negative cash-on-hand possible given paths"
+                  "-> non-linearities in policy functions")
+        else:
+            print("no non-linearities in the policy functions")
+
     def calc_MPC(self, annual=True, income='labor'):
         """ calculate MPCs
             :param annual: calculate annual MPC. """

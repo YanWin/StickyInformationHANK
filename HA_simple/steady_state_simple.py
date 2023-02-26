@@ -31,12 +31,14 @@ def prepare_hh_ss(model):
     # 2. transition matrix initial distribution #
     #############################################
 
+    Dz = np.zeros((par.Nfix, par.Nz))
+
     # start with single point distribution for each z
     for i_fix in range(par.Nfix):
-        ss.Dz[i_fix, :] = e_ergodic / par.Nfix
+        Dz[i_fix, :] = e_ergodic / par.Nfix
         for i_z in range(par.Nz):
             ss.Dbeg[i_fix, i_z, :] *= 0.0
-            ss.Dbeg[i_fix, i_z, 0] = ss.Dz[i_fix, i_z]
+            ss.Dbeg[i_fix, i_z, 0] = Dz[i_fix, i_z]
 
     ################################################
     # 3. initial guess for intertemporal variables #
@@ -63,7 +65,7 @@ def evaluate_ss(model, do_print=False):
 
     ss.y = par.Z_target
     ss.r = par.r_ss_target
-    ss.rl = par.r_ss_target - par.xi
+    ss.rl = ss.r - par.xi
     ss.ey = 0.0
 
     model.solve_hh_ss(do_print=do_print)
@@ -71,14 +73,9 @@ def evaluate_ss(model, do_print=False):
 
     model._compute_jac_hh()
 
-    # MPC_1_year = model.jac_hh[('C_hh', 'y')][0, 0:4].sum()
-    # MPC_1_year = model.jac_hh[('C_hh', 'ey')][0, 0:4].sum()
-    MPC_1_year = np.sum([model.jac_hh[('C_hh', 'ey')][i, 0] / (1 + ss.r) ** i for i in range(4)])
-
-    # MPCs_model = [model.jac_hh[('C_hh', 'y')][0, (t * 4):(t * 4) + 4].sum() for t in [0, 1, 2, 3, 4, 5]]
+    MPC_1_year = np.sum([model.jac_hh[('C_hh', 'ey')][i, 0] / (1 + par.r_ss_target) ** i for i in range(4)])
 
     # j. clearing
-    # ss.MPC_match = (np.array(par.MPC_target) - np.array(MPCs_model)).sum()
     ss.MPC_match = par.MPC_target - MPC_1_year
 
 

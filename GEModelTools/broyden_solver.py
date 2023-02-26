@@ -3,7 +3,7 @@
 import numpy as np
 
 def broyden_solver(f,x0,jac,
-    tol=1e-8,max_iter=100,backtrack_fac=0.5,max_backtrack=30,max_no_improvement=5,
+    tol=1e-8,max_iter=100,backtrack_fac=0.5,max_backtrack=30,max_no_improvement=20,
     do_print=False,do_print_unknowns=False,model=None,
     fixed_jac=False):
     """ numerical solver using the broyden method """

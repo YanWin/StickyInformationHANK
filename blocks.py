@@ -1,333 +1,226 @@
 import numpy as np
 import numba as nb
 
-from GEModelTools import lag, lead
+from GEModelTools import lag, lead, prev, next
 
 
 @nb.njit
-def block_pre(par, ini, ss, path, ncols=1):
-    """ evaluate transition path - before household block """
+def production_firm(par, ini, ss, Y, Ip, I, K, N, s, w, rk, psi,
+                    Div, Div_k, Div_int, Q, r):
 
-    for ncol in range(ncols):
+    Ip_lag = lag(ini.Ip, Ip)
+    I[:] = Ip_lag
 
-        # unpack
-        A = path.A[ncol, :]
-        B = path.B[ncol, :]
-        clearing_A = path.clearing_A[ncol, :]
-        clearing_L = path.clearing_L[ncol, :]
-        clearing_Y = path.clearing_Y[ncol, :]
-        Div_int = path.Div_int[ncol, :]
-        Div_k = path.Div_k[ncol, :]
-        Div = path.Div[ncol, :]
-        eg = path.eg[ncol, :]
-        eg_direct = path.eg_direct[ncol, :]
-        eg_distribution = path.eg_distribution[ncol, :]
-        eg_debt = path.eg_debt[ncol, :]
-        eg_transfer = path.eg_transfer[ncol, :]
-        em = path.em[ncol, :]
-        ez = path.ez[ncol, :]
-        fisher_res = path.fisher_res[ncol, :]
-        G = path.G[ncol, :]
-        i = path.i[ncol, :]
-        I = path.I[ncol, :]
-        invest_res = path.invest_res[ncol, :]
-        Ip = path.Ip[ncol, :]
-        K = path.K[ncol, :]
-        L = path.L[ncol, :]
-        N = path.N[ncol, :]
-        p_eq = path.p_eq[ncol, :]
-        p_int = path.p_int[ncol, :]
-        p_k = path.p_k[ncol, :]
-        p_share = path.p_share[ncol, :]
-        Pi_increase = path.Pi_increase[ncol, :]
-        Pi_w_increase = path.Pi_w_increase[ncol, :]
-        Pi_w = path.Pi_w[ncol, :]
-        Pi = path.Pi[ncol, :]
-        psi = path.psi[ncol, :]
-        q = path.q[ncol, :]
-        Q = path.Q[ncol, :]
-        qB = path.qB[ncol, :]
-        r = path.r[ncol, :]
-        ra = path.ra[ncol, :]
-        rk = path.rk[ncol, :]
-        rl = path.rl[ncol, :]
-        s_w = path.s_w[ncol, :]
-        s = path.s[ncol, :]
-        tau = path.tau[ncol, :]
-        wN = path.wN[ncol, :]
-        valuation_res = path.valuation_res[ncol, :]
-        w_res = path.w_res[ncol, :]
-        w = path.w[ncol, :]
-        Y = path.Y[ncol, :]
-        Z = path.Z[ncol, :]
-        C_hh = path.C_hh[ncol, :]
-        L_hh = path.L_hh[ncol, :]
-        A_hh = path.A_hh[ncol, :]
-        UCE_hh = path.UCE_hh[ncol, :]
+    for t in range(par.T):
+        K_lag = K[t - 1] if t > 0 else ini.K
+        K[t] = (1 - par.delta_K) * K_lag + I[t]
 
-        #################
-        # implied paths #
-        #################
+    N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
+    s[:] = w * N / Y / (1 - par.alpha)
+    rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 
-        ###
-        # a. Production Block
-        ###
+    # dividends
+    I_lag = lag(ini.I, I)
+    S = par.phi_K / 2 * (I / I_lag - 1.0) ** 2
+    psi[:] = I * S
+    Div[:] = Y - w * N - I - psi
+    Div_k[:] = rk * K - I - psi
+    Div_int[:] = (1 - s) * Y
+    assert np.max(Div - Div_int - Div_k) < 1e-10
 
-        # inputs: r,w,Y
-        # outputs: D,N,I,s
+    # investment residual
+    for k in range(par.T):
+        t = par.T - 1 - k
 
-        # Ip -> I and K
-        Ip_lag = lag(ini.Ip, Ip)
-        I[:] = Ip_lag
-        for t in range(par.T):
-            K_lag = K[t - 1] if t > 0 else ini.K
-            K[t] = (1 - par.delta_K) * K_lag + I[t]
+        Q_plus = next(Q, t, ss.Q)
+        rk_plus2 = next(rk, t+1, ss.rk)
 
-        N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
-        wN[:] = w * N
-        s[:] = w * N / Y / (1 - par.alpha)
-        rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
+        Q[t] = (rk_plus2 + (1 - par.delta_K) * Q_plus) / (1 + r[t])
 
-        # Q
-        for t_ in range(par.T):
-            t = par.T - 1 - t_
-            Q_plus = Q[t + 1] if t < par.T - 1 else ss.Q
-            r_plus = r[t + 1] if t < par.T - 1 else ss.r
-            rk_plus2 = rk[t + 2] if t < par.T - 2 else ss.rk
-            Q_t = 1.0 / (1.0 + r_plus) * (rk_plus2 + (1.0 - par.delta_K) * Q_plus)
-            valuation_res[t] = Q_t - Q[t]
+@nb.njit
+def invest_residual(par, ini, ss, Ip, r, Q, invest_res):
+    Ip_lag = lag(ini.Ip, Ip)
+    r_plus = lead(r, ss.r)
+    Ip_plus = lead(Ip, ss.I)
 
-        # investment residual
-        for t in range(par.T):  # par.T-1
-            Ip_plus = Ip[t + 1] if t < par.T - 1 else ss.I
-            r_plus = r[t + 1] if t < par.T - 1 else ss.r
+    Sp = par.phi_K / 2 * (Ip / Ip_lag - 1.0) ** 2
+    Spderiv = par.phi_K * (Ip / Ip_lag - 1.0)
+    Spderiv_plus = par.phi_K * (Ip_plus / Ip - 1.0)
 
-            S = par.phi_K / 2 * (Ip[t] / I[t] - 1.0) ** 2
-            Sderiv = par.phi_K * (Ip[t] / I[t] - 1.0)
-            Sderiv_plus = par.phi_K * (Ip_plus / Ip[t] - 1.0)
+    LHS = 1.0 + Sp + Ip / Ip_lag * Spderiv
+    RHS = Q + 1.0 / (1.0 + r_plus) * (Ip_plus / Ip) ** 2 * Spderiv_plus
 
-            LHS = 1.0 + S + Ip[t] / I[t] * Sderiv
-            RHS = Q[t] + 1.0 / (1.0 + r_plus) * (Ip_plus / Ip[t]) ** 2 * Sderiv_plus
-            invest_res[t] = RHS - LHS
-
-        ###
-        # b. NKPC prices block
-        ###
-        # input: s
-        # output: Pi
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
-            Pi_increase_plus = Pi_increase[t + 1] if t < par.T - 1 else 0
-
-            # kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + r[t])) / par.xi_p \
-            #         * par.e_p / (par.v_p + par.e_p - 1)
-            # Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + r[t])) * Pi_increase_plus
-            kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + ss.r)) / par.xi_p \
-                    * par.e_p / (par.v_p + par.e_p - 1)
-            Pi_increase[t] = kappa * (s[t] - (par.e_p - 1) / par.e_p) + (1 / (1 + ss.r)) * Pi_increase_plus
-
-        for t in range(par.T):
-            Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
-            Pi[t] = Pi_increase[t] + Pi_lag
-
-        ###
-        # c. Taylor rule block
-        ###
-
-        # inputs: Pi
-        # outputs: i
-        assert par.taylor in ['additive', 'multiplicative', 'simple', 'linear'], 'Taylor rule not implemented'
-        for t in range(par.T):
-            i_lag = i[t - 1] if t > 0 else ini.i
-            Pi_lag = Pi[t - 1] if t > 0 else ini.Pi
-            if par.taylor == 'additive':
-                i[t] = par.rho_m * i_lag + (1.0 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
-            elif par.taylor == 'multiplicative':
-                i[t] = (1.0 + ss.r) ** (1.0 - par.rho_m) * (1.0 + i_lag) ** par.rho_m \
-                       * (np.exp(Pi_lag)) ** ((1.0 - par.rho_m) * par.phi_pi) * (1.0 + em[t]) - 1.0
-            elif par.taylor == 'simple':
-                i[t] = ss.r + par.phi_pi * Pi[t] + em[t]
-        if par.taylor == 'linear':  # constant real interest rate
-            for t_ in range(par.T):
-                t = (par.T - 1) - t_
-                Pi_plus = Pi[t + 1] if t < par.T - 1 else ss.Pi
-                i[t] = (1 + ss.r) * (1 + Pi_plus) - 1
-
-
-
-        ###
-        # d. Finance block
-        ###
-
-        # inputs: Div, r
-        # outputs: q, rl, ra
-        r_lag = lag(ini.r, r)
-        rl[:] = r_lag - par.xi
-
-        # Dividends
-        I_lag = lag(ini.I, I)
-        S = par.phi_K / 2 * (I / I_lag - 1.0) ** 2
-        psi[:] = I * S
-
-        Div[:] = Y - w * N - I - psi
-        Div_k[:] = rk * K - I - psi
-        Div_int[:] = (1 - s) * Y
-        # Div_int[:] = Y - w * N - rk * K
-        assert np.max(Div - Div_int - Div_k) < 1e-10
-
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
-
-            # q
-            q_plus = q[t + 1] if t < par.T - 1 else ss.q
-            q[t] = (1 + par.delta_q * q_plus) / (1 + r[t])
-
-            # p_eq
-            p_eq_plus = p_eq[t + 1] if t < par.T - 1 else ss.p_eq
-            Div_plus = Div[t + 1] if t < par.T - 1 else ss.Div
-            p_eq[t] = (Div_plus + p_eq_plus) / (1 + r[t])
-
-            # p_k
-            Div_k_plus = Div_k[t + 1] if t < par.T - 1 else ss.Div_k
-            p_k_plus = p_k[t + 1] if t < par.T - 1 else ss.p_k
-            p_k[t] = (p_k_plus + Div_k_plus) / (1 + r[t])
-
-            # p_int
-            Div_int_plus = Div_int[t + 1] if t < par.T - 1 else ss.Div_int
-            p_int_plus = p_int[t + 1] if t < par.T - 1 else ss.p_int
-            p_int[t] = (p_int_plus + Div_int_plus) / (1 + r[t])
-
-        assert np.max(p_eq - p_int - p_k) < 1e-10
-
-        A_lag = ini.A_hh
-        term_L = (1 + rl[0]) * ini.L_hh + par.xi * ini.L_hh
-
-        term_B = (1 + par.delta_q * q[0]) * ini.B
-        term_eq = p_eq[0] + Div[0]
-
-        ra[0] = (term_B + term_eq - term_L) / A_lag - 1
-        ra[1:] = r[:-1]
-
-        ###
-        # e. Fiscal block
-        ###
-
-        # Inputs: q, w, eg
-        # Outputs: tau, Z, G
-
-        G[:] = ss.G * (1.0 + eg)
-        for t in range(par.T):
-            B_lag = B[t - 1] if t > 0 else ini.B
-            # tau without fiscal policy shock
-            tau_no_shock = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
-            # changes of tax rate depending on the shock and fraction of tax financing
-            delta_tau = ((1.0 - par.phi_G) * ss.G * eg_distribution[t]) / w[t] / N[t]
-            tau[t] = delta_tau + tau_no_shock
-            # gov bonds without shock
-            B_no_shock = (ss.G + (1.0 + par.delta_q * q[t]) * B_lag - tau_no_shock * ss.w * ss.N) / ss.q
-            # changes in B depending on shock and fraction of tax financing
-            delta_B = par.phi_G * ss.G * eg_debt[t] / q[t]
-            B[t] = delta_B + B_no_shock
-
-        qB[:] = q * B
-        Z[:] = (1 - tau) * w * N
-        Z[:] += ez
+    invest_res[:] = RHS - LHS
 
 
 @nb.njit
-def block_post(par, ini, ss, path, ncols=1):
-    """ evaluate transition path - after household block """
+def price_setters(par, ini, ss, s, Pi):
+    for t in range(par.T):
+        Pi_lag = prev(Pi, t, ini.Pi)
+        d_s = 0.0
+        for k in range(t, par.T):
+            d_s += (1 / (1 + ss.r)) ** (k-t) * (s[k] - (par.e_p - 1) / par.e_p)
+        Pi[t] = par.kappa * d_s + Pi_lag
 
-    for ncol in range(ncols):
 
-        # unpack
-        A = path.A[ncol, :]
-        B = path.B[ncol, :]
-        clearing_A = path.clearing_A[ncol, :]
-        clearing_L = path.clearing_L[ncol, :]
-        clearing_Y = path.clearing_Y[ncol, :]
-        Div_int = path.Div_int[ncol, :]
-        Div_k = path.Div_k[ncol, :]
-        Div = path.Div[ncol, :]
-        eg = path.eg[ncol, :]
-        eg_direct = path.eg_direct[ncol, :]
-        eg_distribution = path.eg_distribution[ncol, :]
-        eg_debt = path.eg_debt[ncol, :]
-        eg_transfer = path.eg_transfer[ncol, :]
-        em = path.em[ncol, :]
-        ez = path.ez[ncol, :]
-        fisher_res = path.fisher_res[ncol, :]
-        G = path.G[ncol, :]
-        i = path.i[ncol, :]
-        I = path.I[ncol, :]
-        invest_res = path.invest_res[ncol, :]
-        Ip = path.Ip[ncol, :]
-        K = path.K[ncol, :]
-        L = path.L[ncol, :]
-        N = path.N[ncol, :]
-        p_eq = path.p_eq[ncol, :]
-        p_int = path.p_int[ncol, :]
-        p_k = path.p_k[ncol, :]
-        p_share = path.p_share[ncol, :]
-        Pi_increase = path.Pi_increase[ncol, :]
-        Pi_w_increase = path.Pi_w_increase[ncol, :]
-        Pi_w = path.Pi_w[ncol, :]
-        Pi = path.Pi[ncol, :]
-        psi = path.psi[ncol, :]
-        q = path.q[ncol, :]
-        Q = path.Q[ncol, :]
-        qB = path.qB[ncol, :]
-        r = path.r[ncol, :]
-        ra = path.ra[ncol, :]
-        rk = path.rk[ncol, :]
-        rl = path.rl[ncol, :]
-        s_w = path.s_w[ncol, :]
-        s = path.s[ncol, :]
-        tau = path.tau[ncol, :]
-        wN = path.wN[ncol, :]
-        valuation_res = path.valuation_res[ncol, :]
-        w_res = path.w_res[ncol, :]
-        w = path.w[ncol, :]
-        Y = path.Y[ncol, :]
-        Z = path.Z[ncol, :]
-        C_hh = path.C_hh[ncol, :]
-        L_hh = path.L_hh[ncol, :]
-        A_hh = path.A_hh[ncol, :]
-        UCE_hh = path.UCE_hh[ncol, :]
+@nb.njit
+def taylor(par, ini, ss, em, Pi, i):
+    for t in range(par.T):
+        i_lag = prev(i, t, ini.i)
+        i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
 
-        #################
-        # implied paths #
-        #################
+@nb.njit
+def taylor_passive(par, ini, ss, i, em):
+    i[:] = ss.i + em
 
-        # wage phillips curve
-        kappa_w = (1 - par.xi_w) * (1 - par.xi_w * par.beta_mean) / par.xi_w \
-                  * par.e_w / (par.v_w + par.e_w - 1)
+@nb.njit
+def taylor_constant_r(par, ini, ss, Pi, i, em):
+    Pi_plus = lead(Pi, ss.Pi)
+    i[:] = (1 + ss.r) * (1 + Pi_plus) - 1 + em
 
-        for t_ in range(par.T):
-            t = (par.T - 1) - t_
-            Pi_w_increase_plus = Pi_w_increase[t + 1] if t < par.T - 1 else ss.Pi_w - ss.Pi
+@nb.njit
+def fisher(par, ini, ss, Pi, i, r, fisher_res):
+    Pi_plus = lead(Pi, ss.Pi)
+    fisher_res[:] = 1 + i - (1 + r) * (1 + Pi_plus)
 
-            s_w[t] = par.nu * N[t] ** (1 / par.frisch) / ((1 - tau[t]) * w[t] * UCE_hh[t])
+@nb.njit
+def mutual_fund(par, ini, ss, r, Div, q, p_eq, rl, ra):
 
-            Pi_w_increase[t] = kappa_w * (s_w[t] - (par.e_w - 1) / par.e_w) + par.beta_mean * Pi_w_increase_plus
+    r_lag = lag(ini.r, r)
+    rl[:] = r_lag - par.xi
 
-        for t in range(par.T):
-            Pi_lag = Pi[t - 1] if t > 0 else ss.Pi
-            Pi_w[t] = Pi_w_increase[t] + Pi_lag
+    for t_ in range(par.T):
+        t = (par.T - 1) - t_
 
-        # Fisher equation
-        Pi_plus = lead(Pi, ss.Pi)
-        fisher_res[:] = 1 + i - (1 + r) * (1 + Pi_plus)
+        # q
+        q_plus = next(q, t, ss.q)
+        q[t] = (1 + par.delta_q * q_plus) / (1 + r[t])
 
-        # wage residual (approximate)
-        w_lag = lag(ini.w, w)
-        w_res[:] = np.log(w / w_lag) - (Pi_w - Pi)
+        # p_eq
+        p_eq_plus = next(p_eq, t, ss.p_eq)
+        Div_plus = next(Div, t, ss.Div)
+        p_eq[t] = (Div_plus + p_eq_plus) / (1 + r[t])
 
-        # market clearing
-        L[:] = L_hh
-        L_lag = lag(ini.L, L)
+    A_lag = ini.A
+    term_L = (1 + rl[0]) * ini.L + par.xi * ini.L
 
-        clearing_Y[:] = Y - (C_hh + ss.G * (1.0 + eg_direct) + I + psi + par.xi * L_lag)
+    term_B = (1 + par.delta_q * q[0]) * ini.B
+    term_eq = p_eq[0] + Div[0]
 
-        A[:] = p_eq + qB - L
-        clearing_A[:] = A_hh - A
+    ra[0] = (term_B + term_eq - term_L) / A_lag - 1
+    ra[1:] = r[:-1]
+
+
+@nb.njit
+def government_custom(par, ini, ss, tau, B, G, eB, eG, etau, Z, w, N):
+    tau[:] = ss.tau + etau
+    B[:] = ss.B + eB
+    G[:] = ss.G + eG
+
+    Z[:] = (1 - tau) * w * N
+
+@nb.njit
+def government(par, ini, ss, eg, w, N, q, G, tau, B, Z):
+    G[:] = ss.G * (1 + eg)
+    for t in range(par.T):
+        B_lag = prev(B, t, ini.B)
+
+        tau_no_shock = ss.tau + par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y
+        delta_tau = (1 - par.phi_G) * ss.G * eg[t] / (w[t] * N[t])
+
+        tau[t] = tau_no_shock + delta_tau
+        B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] - tau[t] * w[t] * N[t]) / q[t]
+
+    Z[:] = (1 - tau) * w * N
+
+
+@nb.njit
+def government2(par, ini, ss, eg, w, N, q, G, tau, B, Z):
+    G[:] = ss.G * (1.0 + eg)
+    for t in range(par.T):
+        B_lag = B[t - 1] if t > 0 else ini.B
+        # tau without fiscal policy shock
+        tau_no_shock = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
+        # changes of tax rate depending on the shock and fraction of tax financing
+        delta_tau = ((1.0 - par.phi_G) * ss.G * eg[t]) / w[t] / N[t]
+        tau[t] = delta_tau + tau_no_shock
+        # gov bonds without shock
+        B_no_shock = (ss.G + (1.0 + par.delta_q * q[t]) * B_lag - tau_no_shock * ss.w * ss.N) / ss.q
+        # changes in B depending on shock and fraction of tax financing
+        delta_B = par.phi_G * ss.G * eg[t] / q[t]
+        B[t] = delta_B + B_no_shock
+
+    Z[:] = (1 - tau) * w * N
+
+@nb.njit
+def government3(par, ini, ss, eg, w, N, q, G, tau, B, Z):
+
+    q_lag = lag(ini.q, q)
+    w_lag = lag(ini.w, w)
+    N_lag = lag(ini.N, N)
+    d_q = q - q_lag
+    d_w = w - w_lag
+    d_N = N - N_lag
+
+    G[:] = ss.G * (1.0 + eg)
+    for t in range(par.T):
+        B_lag = prev(B, t, ini.B)
+        B_lag2 = prev(B, t-1, ini.B)
+        d_B_lag = B_lag - B_lag2
+        tau_lag = prev(tau, t, ini.tau)
+
+        d_B = par.phi_G * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
+                           - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / q[t]
+        d_tau = (1 - par.phi_G) * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
+                                   - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / (w[t] * N[t])
+
+        B[t] = B_lag + d_B
+        tau[t] = tau_lag + d_tau
+
+    Z[:] = (1 - tau) * w * N
+
+def government_constant_B(par, ini, ss, eg, w, N, q, G, tau, B, Z):
+
+    G[:] = ss.G * (1.0 + eg)
+    B[:] = ss.B
+    tau[:] = (G + (1 + par.delta_q * q) * ss.B - q * ss.B) / (w * N)
+
+    Z[:] = (1 - tau) * w * N
+
+
+@nb.njit
+def union(par, ini, ss, tau, w, UCE_hh, s_w, N, Pi_w, Pi):
+    Pi_lag = lag(ini.Pi, Pi)
+
+    s_w[:] = par.nu * N ** (1 / par.frisch) / ((1 - tau) * w * UCE_hh)
+
+    for t in range(par.T):
+        d_s_w = 0.0
+        for k in range(t, par.T):
+            d_s_w += par.beta_mean ** (k-t) * (s_w[k] - (par.e_w - 1) / par.e_w)
+        Pi_w[t] = par.kappa * d_s_w + Pi_lag[t]
+
+
+
+@nb.jit
+def real_wage(par, ini, ss, w, Pi_w, Pi, w_res):
+    w_lag = lag(ini.w, w)
+    w_res[:] = np.log(w / w_lag) - (Pi_w - Pi)
+
+
+@nb.jit
+def market_clearing(par, ini, ss, Y, L_hh, C_hh, G, I, psi, K, q, B, p_eq, A_hh, qB, A, L, clearing_Y,
+                    clearing_A, clearing_L):
+    # Y
+    L[:] = L_hh
+    L_lag = lag(ini.L, L)
+    clearing_Y[:] = Y - (C_hh + G + I + psi + par.xi * L_lag)
+
+    # A
+    qB[:] = q * B
+    A[:] = p_eq + qB - L
+    clearing_A[:] = A_hh - A
+
+    # L
+    clearing_L[:] = L_hh - L
+

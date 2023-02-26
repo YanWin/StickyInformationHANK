@@ -986,7 +986,7 @@ class GEModelClass:
 
         if do_print: print(f' [computed in {elapsed(t0)}]')
 
-    def _calc_jac_hh_fakenews(self,inputs_hh_all=None,dx=1e-4,do_print=False):
+    def _calc_jac_hh_fakenews(self,inputs_hh_all=None,dx=1e-4,do_print=False, s_list=None, t_list=None):
         """ compute Jacobian of household problem with fake news algorithm """
 
         if inputs_hh_all is None: inputs_hh_all = self.inputs_hh_all
@@ -1046,6 +1046,8 @@ class GEModelClass:
                     self.dpols[(polname,inputname)] = np.zeros(getattr(path,polname).shape)
 
                 for s in range(par.T):
+
+                    if s_list is not None and s not in s_list: continue
                     
                     # i. solve gradually backwards
                     stepvars_hh = self._get_stepvars_hh_ss(outputs_inplace=False)
@@ -1125,6 +1127,8 @@ class GEModelClass:
             curly_E[outputname][0] = simulate_hh_forwards_exo_transpose(temp,ss.z_trans)
 
         for t in range(1,par.T-1):
+
+            if t_list is not None and t not in t_list: continue
             
             for outputname in self.outputs_hh:
                 temp = simulate_hh_forwards_endo_transpose(curly_E[outputname][t-1],ss.pol_indices,ss.pol_weights)
@@ -1160,20 +1164,20 @@ class GEModelClass:
         if do_print: print(f'builiding blocks combined in {elapsed(t0)}')
         if do_print: print(f'household Jacobian computed in {elapsed(t0_all)}')
         
-    def _compute_jac_hh(self,dx=1e-4,inputs_hh_all=None,do_print=False,do_direct=False,s_list=None):
+    def _compute_jac_hh(self,dx=1e-4,inputs_hh_all=None,do_print=False,do_direct=False,s_list=None, t_list=None):
         """ compute Jacobian of household problem """
 
         t0 = time.time()
 
         if inputs_hh_all is None: inputs_hh_all = self.inputs_hh_all
-        if not do_direct: assert s_list is None, 'not implemented for fake news algorithm'
+        # if not do_direct: assert s_list is None, 'not implemented for fake news algorithm'
 
         self._path_fakenews = {}
 
         # a. fake news
         if not do_direct:
             
-            self._calc_jac_hh_fakenews(dx=dx,inputs_hh_all=inputs_hh_all,do_print=do_print)
+            self._calc_jac_hh_fakenews(dx=dx,inputs_hh_all=inputs_hh_all,do_print=do_print,s_list=s_list,t_list=t_list)
 
         # b. direct
         else:
@@ -1320,6 +1324,31 @@ class GEModelClass:
 
         if not (do_unknowns or do_shocks):
             return jac_dict
+
+    def _compute_sticky_jacs_hh(self, jac):
+        """ calculate sticky information household Jacobians"""
+
+        par = self.par
+
+        jac_sticky = jac.copy()
+
+        for key in jac.keys():
+            # init
+            jac_sticky_temp = np.zeros_like(jac[key])
+            # fill
+            T = jac[key].shape[0]
+            for t in range(T):
+                for s in range(T):
+                    if s == 0:
+                        jac_sticky_temp[t, s] = jac[key][t, s]
+                    elif t == 0:
+                        jac_sticky_temp[t, s] = (1 - par.inattention) * jac[key][t, s]
+                    else:
+                        jac_sticky_temp[t, s] = par.inattention * jac_sticky_temp[t - 1, s - 1] \
+                                                + (1 - par.inattention) * jac[key][t, s]
+            # input
+            jac_sticky[key] = jac_sticky_temp
+        return jac_sticky
             
     def compute_jacs(self,dx=1e-4,skip_hh=False,inputs_hh_all=None,skip_shocks=False,do_print=False,do_direct=False):
         """ compute all Jacobians """
@@ -1327,11 +1356,19 @@ class GEModelClass:
         if not skip_hh and len(self.outputs_hh) > 0:
             if do_print: print('household Jacobians:')
             self._compute_jac_hh(inputs_hh_all=inputs_hh_all,dx=dx,do_direct=do_direct,do_print=do_print)
+            if hasattr(self.par, 'inattention'):
+                if self.par.inattention > 0.0:
+                    if do_print:
+                        print(f'household inattention = {self.par.inattention}')
+                    if do_direct: print('household calculation based on direct method '
+                                        '-> sticky information jacs wont be correct')
+                    self.jac_hh = self._compute_sticky_jacs_hh(self.jac_hh)
             if do_print: print('')
 
         if do_print: print('full Jacobians:')
         self._compute_jac(inputs='unknowns',dx=dx,do_print=do_print)
         if not skip_shocks: self._compute_jac(inputs='shocks',dx=dx,do_print=do_print)
+
 
     ####################################
     # 5. find transition path and IRFs #
@@ -1726,10 +1763,10 @@ class GEModelClass:
     # 6. IRFs #
     ###########
 
-    def show_IRFs(self,varnames,
-        abs_diff=None,lvl_value=None,facs=None,pows=None,
-        do_shocks=True,do_targets=True,do_linear=False,
-        T_max=None,ncols=4,filename=None):
+    def show_IRFs(self, varnames,
+                  abs_diff=None, lvl_value=None, facs=None, pows=None,
+                  do_shocks=True, do_targets=True, do_linear=False, do_non_linear=True,
+                  T_max=None, ncols=4, filename=None):
         """ shows IRFS """
 
         # varnames: list[str], variable names
@@ -1745,15 +1782,17 @@ class GEModelClass:
 
         models = [self]
         labels = ['non-linear']
-        show_IRFs(models,labels,varnames,
-            abs_diff=abs_diff,lvl_value=lvl_value,facs=facs,pows=pows,
-            do_shocks=do_shocks,do_targets=do_targets,do_linear=do_linear,
-            T_max=T_max,ncols=ncols,filename=filename)
+        show_IRFs(models, labels, varnames,
+                  abs_diff=abs_diff, lvl_value=lvl_value, facs=facs, pows=pows,
+                  do_shocks=do_shocks, do_targets=do_targets, do_linear=do_linear,
+                  do_non_linear=do_non_linear, T_max=T_max, ncols=ncols, filename=filename)
 
-    def compare_IRFs(self,models,labels,varnames,
-        abs_diff=None,lvl_value=None,facs=None,pows=None,
-        do_shocks=True,do_targets=True,
-        T_max=None,ncols=4,filename=None):
+    @staticmethod
+    def compare_IRFs(models, labels, varnames,
+                     abs_diff=None, lvl_value=None, facs=None, pows=None,
+                     do_shocks=True, do_targets=True,
+                     do_linear=True, do_non_linear=False,
+                     T_max=None, ncols=4, filename=None):
         """ compare IRFs across models """
 
         # models: list[GEModelClass], models
@@ -1768,11 +1807,12 @@ class GEModelClass:
         # T_max: int, length of IRF
         # ncols: number of columns
         # filename: filename if saving figure
-                 
-        show_IRFs(models,labels,varnames,
-            abs_diff=abs_diff,lvl_value=lvl_value,facs=facs,pows=pows,
-            do_shocks=do_shocks,do_targets=do_targets,
-            T_max=T_max,ncols=ncols,filename=filename)
+
+        show_IRFs(models, labels, varnames,
+                  abs_diff=abs_diff, lvl_value=lvl_value, facs=facs, pows=pows,
+                  do_shocks=do_shocks, do_targets=do_targets,
+                  do_linear=do_linear, do_non_linear=do_non_linear,
+                  T_max=T_max, ncols=ncols, filename=filename)
   
     ###############
     # 7. simulate #

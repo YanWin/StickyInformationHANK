@@ -7,7 +7,7 @@ from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
 @nb.njit
-def solve_hh_backwards(par,z_trans,tau,wN,ez,eg_transfer,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
+def solve_hh_backwards(par,z_trans,Z,eg_transfer,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
@@ -22,8 +22,7 @@ def solve_hh_backwards(par,z_trans,tau,wN,ez,eg_transfer,ra,rl,vbeg_l_a_plus,vbe
         for i_z in range(par.Nz):
 
             e = par.z_grid[i_z]  # productivity
-            Z = (1 - tau) * wN + ez
-            Ze = Z*e + eg_transfer  # labor income
+            Ze = Z * e + eg_transfer # labor income
 
             # ii. inverse foc
             for i_a in range(par.Na):
@@ -41,12 +40,11 @@ def solve_hh_backwards(par,z_trans,tau,wN,ez,eg_transfer,ra,rl,vbeg_l_a_plus,vbe
                     m = (1 + rl) * par.l_grid[i_l] + Ze + d
 
                     l[i_fix,i_z,i_l,i_a] = interp_1d(m_endo, par.l_grid, m)
-
                     l[i_fix,i_z,i_l,i_a] = np.fmax(l[i_fix,i_z,i_l,i_a],0.0)  # enforce borrowing constraint
+
                     c[i_fix,i_z,i_l,i_a] = m-l[i_fix, i_z,i_l,i_a]
-                    #  for some combinations of l,e and d, m can get negative because distribution to illiquid account
-                    #  (expenses) > income.
                     c[i_fix,i_z,i_l,i_a] = np.fmax(c[i_fix,i_z,i_l,i_a],0.0)    # enforce non-negative consumption
+
                     a[i_fix,i_z,i_l,i_a] = (1+ra)*a_lag-d  # next periods illiquid assets
                     assert not a[i_fix,i_z,i_l,i_a] < 0, 'negative illiquid assets'
 

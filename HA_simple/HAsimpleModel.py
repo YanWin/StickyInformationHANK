@@ -30,24 +30,25 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
         self.intertemps_hh = ['vbeg_l']  # intertemporal variables
 
         # c. GE
-        # self.shocks = ['eg','em','ez']  # exogenous shocks
         self.shocks = ['ey']  # exogenous shocks
         self.unknowns = []  # endogenous unknowns
-        self.targets = []  # targets = 0
+        self.targets = ['MPC_match']  # targets = 0
+        self.blocks = [
+            'hh'
+        ]
 
-        # d. all variables
+        # d. all other variables
         self.varlist = [
+            'MPC_match',
+            'ey',
             'y',
             'rl',
-            'r',
-            'MPC_match',
-            'ey'
+            'r'
             ]
 
         # e. functions
         self.solve_hh_backwards = household_problem_simple.solve_hh_backwards
-        self.block_pre = blocks_simple.block_pre
-        self.block_post = blocks_simple.block_post
+
 
     def setup(self):
         """ set baseline parameters """
@@ -106,6 +107,10 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
         par.tol_simulate = 1e-12  # tolerance when simulating household problem
         par.tol_broyden = 1e-12  # tolerance when solving eq. system
 
+        par.py_hh = False # call solve_hh_backwards in Python-model
+        par.py_block = False # call blocks in Python-model
+        par.full_z_trans = False # let z_trans vary over endogenous states
+
 
     def allocate(self):
         """ allocate model """
@@ -113,12 +118,10 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
         par = self.par
         par.beta_grid = np.zeros(par.Nfix)
 
-        self.allocate_GE()
+        self.allocate_GE(update_varlist=False)
 
 
     # override steady state functions
     prepare_hh_ss = steady_state_simple.prepare_hh_ss
     find_ss = steady_state_simple.find_ss
 
-    # additional tests
-    test_jacs_sticky = tests.jacs_sticky

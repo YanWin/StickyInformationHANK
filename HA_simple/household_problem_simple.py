@@ -6,7 +6,7 @@ import numba as nb
 from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
-@nb.njit
+@nb.njit(parallel=True)
 def solve_hh_backwards(par,z_trans,y,rl,ey,vbeg_l_plus,vbeg_l,l,c):
     """ solve backwards with vbeg_l_a from previous iteration """
 
