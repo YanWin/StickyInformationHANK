@@ -69,9 +69,9 @@ def taylor(par, ini, ss, em, Pi, i):
         i_lag = prev(i, t, ini.i)
         i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
 
-@nb.njit
-def taylor_passive(par, ini, ss, i, em):
-    i[:] = ss.i + em
+# @nb.njit
+# def taylor_passive(par, ini, ss, i, em):
+#     i[:] = ss.i + em
 
 @nb.njit
 def taylor_constant_r(par, ini, ss, Pi, i, em):
@@ -120,72 +120,55 @@ def government_custom(par, ini, ss, tau, B, G, eB, eG, etau, Z, w, N):
     Z[:] = (1 - tau) * w * N
 
 @nb.njit
-def government(par, ini, ss, eg, w, N, q, G, tau, B, Z):
-    G[:] = ss.G * (1 + eg)
+def government(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
+    G[:] = ss.G * (1 + eg) + eg_transfer
     for t in range(par.T):
         B_lag = prev(B, t, ini.B)
 
         tau_no_shock = ss.tau + par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y
-        delta_tau = (1 - par.phi_G) * ss.G * eg[t] / (w[t] * N[t])
+        delta_tau = (1 - par.phi_G) * (G[t] - ss.G) / (w[t] * N[t])
 
         tau[t] = tau_no_shock + delta_tau
         B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] - tau[t] * w[t] * N[t]) / q[t]
 
     Z[:] = (1 - tau) * w * N
 
+def government_constant_B(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
 
-@nb.njit
-def government2(par, ini, ss, eg, w, N, q, G, tau, B, Z):
-    G[:] = ss.G * (1.0 + eg)
-    for t in range(par.T):
-        B_lag = B[t - 1] if t > 0 else ini.B
-        # tau without fiscal policy shock
-        tau_no_shock = par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y + ss.tau
-        # changes of tax rate depending on the shock and fraction of tax financing
-        delta_tau = ((1.0 - par.phi_G) * ss.G * eg[t]) / w[t] / N[t]
-        tau[t] = delta_tau + tau_no_shock
-        # gov bonds without shock
-        B_no_shock = (ss.G + (1.0 + par.delta_q * q[t]) * B_lag - tau_no_shock * ss.w * ss.N) / ss.q
-        # changes in B depending on shock and fraction of tax financing
-        delta_B = par.phi_G * ss.G * eg[t] / q[t]
-        B[t] = delta_B + B_no_shock
-
-    Z[:] = (1 - tau) * w * N
-
-@nb.njit
-def government3(par, ini, ss, eg, w, N, q, G, tau, B, Z):
-
-    q_lag = lag(ini.q, q)
-    w_lag = lag(ini.w, w)
-    N_lag = lag(ini.N, N)
-    d_q = q - q_lag
-    d_w = w - w_lag
-    d_N = N - N_lag
-
-    G[:] = ss.G * (1.0 + eg)
-    for t in range(par.T):
-        B_lag = prev(B, t, ini.B)
-        B_lag2 = prev(B, t-1, ini.B)
-        d_B_lag = B_lag - B_lag2
-        tau_lag = prev(tau, t, ini.tau)
-
-        d_B = par.phi_G * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
-                           - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / q[t]
-        d_tau = (1 - par.phi_G) * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
-                                   - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / (w[t] * N[t])
-
-        B[t] = B_lag + d_B
-        tau[t] = tau_lag + d_tau
-
-    Z[:] = (1 - tau) * w * N
-
-def government_constant_B(par, ini, ss, eg, w, N, q, G, tau, B, Z):
-
-    G[:] = ss.G * (1.0 + eg)
+    G[:] = ss.G * (1 + eg) + eg_transfer
     B[:] = ss.B
     tau[:] = (G + (1 + par.delta_q * q) * ss.B - q * ss.B) / (w * N)
 
     Z[:] = (1 - tau) * w * N
+
+# @nb.njit
+# def government3(par, ini, ss, eg, w, N, q, G, tau, B, Z):
+#
+#     q_lag = lag(ini.q, q)
+#     w_lag = lag(ini.w, w)
+#     N_lag = lag(ini.N, N)
+#     d_q = q - q_lag
+#     d_w = w - w_lag
+#     d_N = N - N_lag
+#
+#     G[:] = ss.G * (1.0 + eg)
+#     for t in range(par.T):
+#         B_lag = prev(B, t, ini.B)
+#         B_lag2 = prev(B, t-1, ini.B)
+#         d_B_lag = B_lag - B_lag2
+#         tau_lag = prev(tau, t, ini.tau)
+#
+#         d_B = par.phi_G * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
+#                            - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / q[t]
+#         d_tau = (1 - par.phi_G) * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
+#                                    - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / (w[t] * N[t])
+#
+#         B[t] = B_lag + d_B
+#         tau[t] = tau_lag + d_tau
+#
+#     Z[:] = (1 - tau) * w * N
+
+
 
 
 @nb.njit
@@ -201,7 +184,6 @@ def union(par, ini, ss, tau, w, UCE_hh, s_w, N, Pi_w, Pi):
         Pi_w[t] = par.kappa * d_s_w + Pi_lag[t]
 
 
-
 @nb.jit
 def real_wage(par, ini, ss, w, Pi_w, Pi, w_res):
     w_lag = lag(ini.w, w)
@@ -209,12 +191,12 @@ def real_wage(par, ini, ss, w, Pi_w, Pi, w_res):
 
 
 @nb.jit
-def market_clearing(par, ini, ss, Y, L_hh, C_hh, G, I, psi, K, q, B, p_eq, A_hh, qB, A, L, clearing_Y,
+def market_clearing(par, ini, ss, Y, L_hh, C_hh, G, eg_transfer, I, psi, q, B, p_eq, A_hh, qB, A, L, clearing_Y,
                     clearing_A, clearing_L):
     # Y
     L[:] = L_hh
     L_lag = lag(ini.L, L)
-    clearing_Y[:] = Y - (C_hh + G + I + psi + par.xi * L_lag)
+    clearing_Y[:] = Y - (C_hh + (G - eg_transfer) + I + psi + par.xi * L_lag)
 
     # A
     qB[:] = q * B
@@ -223,4 +205,6 @@ def market_clearing(par, ini, ss, Y, L_hh, C_hh, G, I, psi, K, q, B, p_eq, A_hh,
 
     # L
     clearing_L[:] = L_hh - L
+
+    # clearing_wealth =
 

@@ -86,7 +86,7 @@ def show_IRFs(models,labels,varnames,
                         if do_non_linear:
                             ax.plot(np.arange(T_max), pathvalue[:T_max], label=label)
                         if do_linear:
-                            ax.plot(np.arange(T_max),IRFvalue[:T_max],ls='--',label='linear')
+                            ax.plot(np.arange(T_max),IRFvalue[:T_max],ls=ls_linear,label=label_linear)
 
                         if not np.isclose(facs[varname],1.0):
                             ax.set_ylabel(fr'{facs[varname]:.0f} x level')
@@ -107,7 +107,7 @@ def show_IRFs(models,labels,varnames,
                         if do_non_linear:
                             ax.plot(np.arange(T_max), pathvalue[:T_max]-ssvalue, label=label)
                         if do_linear:
-                            ax.plot(np.arange(T_max),IRFvalue[:T_max]-ssvalue,ls='--',label='linear')
+                            ax.plot(np.arange(T_max),IRFvalue[:T_max]-ssvalue,ls=ls_linear,label=label_linear)
 
                         if varname in facs:
                             ax.set_ylabel(fr'{facs[varname]:.0f} x abs. diff. to of s.s.')
@@ -119,7 +119,7 @@ def show_IRFs(models,labels,varnames,
                         if do_non_linear:
                             ax.plot(np.arange(T_max), 100 * (pathvalue[:T_max] / ssvalue - 1), label=label)
                         if do_linear:
-                            ax.plot(np.arange(T_max),100*(IRFvalue[:T_max]/ssvalue-1),ls='--',label='linear')
+                            ax.plot(np.arange(T_max),100*(IRFvalue[:T_max]/ssvalue-1),ls=ls_linear,label=label_linear)
 
                         ax.set_ylabel('% diff. to s.s.')
 
@@ -127,7 +127,7 @@ def show_IRFs(models,labels,varnames,
 
                     ax.plot(np.arange(T_max),pathvalue[:T_max],label=label)
                     if do_linear:
-                        ax.plot(np.arange(T_max),IRFvalue[:T_max],ls='--',label='linear')
+                        ax.plot(np.arange(T_max),IRFvalue[:T_max],ls=ls_linear,label=label_linear)
 
             if (len(labels) > 1 or (do_linear and do_non_linear)) and i == 0: ax.legend(frameon=True)
             
@@ -137,3 +137,5 @@ def show_IRFs(models,labels,varnames,
 
         # save
         if not filename is None: fig.savefig(f'{filename}_{typename}.pdf')
+
+

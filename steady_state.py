@@ -104,7 +104,7 @@ def evaluate_ss(model, do_print=False):
     ss = model.ss
 
     # a. exogenous and targets
-    ss.Y = 1.0  # normalization
+    ss.Y = par.Y_target  # normalization
     ss.N = 1.0  # normalization
 
     ss.r = par.r_ss_target
@@ -167,9 +167,9 @@ def evaluate_ss(model, do_print=False):
     ss.eg = 0.0
     ss.em = 0.0
     ss.eg_transfer = 0.0
-    # ss.eG = 0.0
-    # ss.etau = 0.0
-    # ss.eB = 0.0
+    ss.eG = 0.0
+    ss.etau = 0.0
+    ss.eB = 0.0
     # ss.eg_debt = 0.0
     # ss.eg_direct = 0.0
     # ss.eg_distribution = 0.0
@@ -208,8 +208,8 @@ def objective_ss(x, model, do_print=False):
     ss.clearing_MPC = par.MPC_target - MPC_annual
 
     if do_print:
-        print(f' beta = {par.beta_mean:16.12f} -> {ss.clearing_Y = :16.12f} [{elapsed(t0)}]')
-        print(f' sigma_e = {par.sigma_e:16.12f} -> {ss.clearing_MPC = :16.12f} [{elapsed(t0)}]')
+        # print(f' beta = {par.beta_mean:16.12f} -> {ss.clearing_Y = :16.12f} [{elapsed(t0)}]')
+        print(f' [beta, sigma_e] = [{par.beta_mean:16.12f}, {par.sigma_e:16.12f}] -> [{ss.clearing_Y = :16.12f}, {ss.clearing_MPC = :16.12f}] [{elapsed(t0)}]')
 
     # return ss.clearing_Y
     return ss.clearing_Y, ss.clearing_MPC

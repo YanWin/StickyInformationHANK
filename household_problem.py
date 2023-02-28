@@ -7,13 +7,12 @@ from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
 @nb.njit
-def solve_hh_backwards(par,z_trans,Z,eg_transfer,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
+def solve_hh_backwards(par,z_trans,Z,ra,rl,eg_transfer,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
     A_target = par.A_target
     ra_ss = par.r_ss_target
-
 
     # solve
     for i_fix in range(par.Nfix):
@@ -22,7 +21,7 @@ def solve_hh_backwards(par,z_trans,Z,eg_transfer,ra,rl,vbeg_l_a_plus,vbeg_l_a,l,
         for i_z in range(par.Nz):
 
             e = par.z_grid[i_z]  # productivity
-            Ze = Z * e + eg_transfer # labor income
+            Ze = Z * e + eg_transfer  # labor income
 
             # ii. inverse foc
             for i_a in range(par.Na):

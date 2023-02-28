@@ -32,8 +32,8 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
         # c. GE
-        self.shocks = ['eg','em','eg_transfer']  # exogenous shocks
-        # self.shocks = ['eg','em','eg_transfer','eB','eG','etau']  # exogenous shocks
+        # self.shocks = ['eg','em','eg_transfer']  # exogenous shocks
+        self.shocks = ['eg','em','eg_transfer','eB','eG','etau']  # exogenous shocks
         self.unknowns = ['r','w','Y','Ip']  # endogenous unknowns
         self.targets = ['fisher_res','w_res','clearing_Y','invest_res']  # targets = 0
         self.blocks = [
@@ -62,9 +62,9 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'Div_int',
             'Div_k',
             'Div',
-            # 'eB',
-            # 'eG',
-            # 'etau',
+            'eB',
+            'eG',
+            'etau',
             'eg',
             # 'eg_direct',
             # 'eg_distribution',
@@ -122,9 +122,11 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.hh_wealth_Y_ratio = 3.82*4  # aggregate household wealth - quarterly
         # par.A_L_ratio = 0.85
         par.G_Y_ratio = 0.16  # spending-to-GDP
+        par.G_ss = np.nan
         par.qB_Y_ratio = 0.42*4  # government bonds to GDP - quarterly
         par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
         par.A_target = np.nan
+        par.Y_target = 1.0
 
         # a. preferences
         par.sigma = 1.0  # CRRA coefficient
@@ -191,6 +193,15 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.jump_em = 0.0 # initial jump
         par.rho_em = 0.0  # AR(1) coefficient
         par.std_em = 0.0  # std. of innovation
+        # 3. transfers
+        par.jump_eg_transfer = 0.0  # initial jump
+        par.rho_eg_transfer = 0.0  # AR(1) coefficient
+        par.std_eg_transfer = 0.0  # std. of innovation
+
+        #
+        par.jump_eG = par.jump_etau = par.jump_eB = 0.0
+        par.rho_eG = par.rho_etau = par.rho_eB = 0.0
+        par.std_eG = par.std_etau = par.std_eB = 0.0
         # # 4a. direct effect
         # par.jump_eg_direct = par.jump_eg  # initial jump
         # par.rho_eg_direct = par.rho_eg  # AR(1) coefficient
@@ -203,10 +214,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         # par.jump_eg_debt = par.jump_eg  # initial jump
         # par.rho_eg_debt = par.rho_eg  # AR(1) coefficient
         # par.std_eg_debt = par.std_eg  # std. of innovation
-        # 4d. direct transfers
-        par.jump_eg_transfer = 0.0  # initial jump
-        par.rho_eg_transfer = 0.0  # AR(1) coefficient
-        par.std_eg_transfer = 0.0  # std. of innovation
+
 
 
         # k. misc.
@@ -220,7 +228,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.tol_ss = 1e-12  # tolerance when finding steady state
         par.tol_solve = 1e-12  # tolerance when solving household problem
         par.tol_simulate = 1e-12  # tolerance when simulating household problem
-        par.tol_broyden = 1e-12  # tolerance when solving eq. system
+        par.tol_broyden = 1e-8  # tolerance when solving eq. system
 
         par.py_hh = False # call solve_hh_backwards in Python-model
         par.py_block = True # call blocks in Python-model
