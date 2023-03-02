@@ -54,6 +54,13 @@ def invest_residual(par, ini, ss, Ip, r, Q, invest_res):
 
 
 @nb.njit
+def price_setters_no_indexation(par, ini, ss, s, Pi):
+
+    for k in range(par.T):
+        t = par.T - 1 - k
+        Pi_plus = next(Pi, t, ss.Pi)
+        Pi[t] = par.kappa * (s[t] - (par.e_p - 1) / par.e_p) + 1 / (1 + ss.r) * Pi_plus
+
 def price_setters(par, ini, ss, s, Pi):
     for t in range(par.T):
         Pi_lag = prev(Pi, t, ini.Pi)
@@ -69,14 +76,6 @@ def taylor(par, ini, ss, em, Pi, i):
         i_lag = prev(i, t, ini.i)
         i[t] = par.rho_m * i_lag + (1 - par.rho_m) * (ss.r + par.phi_pi * Pi[t]) + em[t]
 
-# @nb.njit
-# def taylor_passive(par, ini, ss, i, em):
-#     i[:] = ss.i + em
-
-@nb.njit
-def taylor_constant_r(par, ini, ss, Pi, i, em):
-    Pi_plus = lead(Pi, ss.Pi)
-    i[:] = (1 + ss.r) * (1 + Pi_plus) - 1 + em
 
 @nb.njit
 def fisher(par, ini, ss, Pi, i, r, fisher_res):
@@ -133,6 +132,15 @@ def government(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
 
     Z[:] = (1 - tau) * w * N
 
+def government_constant_Z(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
+
+    G[:] = ss.G * (1 + eg) + eg_transfer
+    Z[:] = ss.Z
+    tau[:] = 1 - ss.Z / (w * N)
+    for t in range(par.T):
+        B_lag = prev(B, t, ini.B)
+        B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] - tau[t] * w[t] * N[t]) / q[t]
+
 def government_constant_B(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
 
     G[:] = ss.G * (1 + eg) + eg_transfer
@@ -141,37 +149,17 @@ def government_constant_B(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
 
     Z[:] = (1 - tau) * w * N
 
-# @nb.njit
-# def government3(par, ini, ss, eg, w, N, q, G, tau, B, Z):
-#
-#     q_lag = lag(ini.q, q)
-#     w_lag = lag(ini.w, w)
-#     N_lag = lag(ini.N, N)
-#     d_q = q - q_lag
-#     d_w = w - w_lag
-#     d_N = N - N_lag
-#
-#     G[:] = ss.G * (1.0 + eg)
-#     for t in range(par.T):
-#         B_lag = prev(B, t, ini.B)
-#         B_lag2 = prev(B, t-1, ini.B)
-#         d_B_lag = B_lag - B_lag2
-#         tau_lag = prev(tau, t, ini.tau)
-#
-#         d_B = par.phi_G * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
-#                            - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / q[t]
-#         d_tau = (1 - par.phi_G) * (ss.G * eg[t] + (1 + par.delta_q * d_q[t]) * ss.B + (1 + par.delta_q * q[t]) * d_B_lag
-#                                    - d_q[t] * ss.B - ss.tau * d_w[t] * d_N[t]) / (w[t] * N[t])
-#
-#         B[t] = B_lag + d_B
-#         tau[t] = tau_lag + d_tau
-#
-#     Z[:] = (1 - tau) * w * N
-
-
-
 
 @nb.njit
+def union_no_indexation(par, ini, ss, tau, w, UCE_hh, s_w, N, Pi_w):
+
+    s_w[:] = par.nu * N ** (1 / par.frisch) / ((1 - tau) * w * UCE_hh)
+
+    for k in range(par.T):
+        t = par.T - 1 - k
+        Pi_w_plus = next(Pi_w, t, ss.Pi_w)
+        Pi_w[t] = par.kappa_w * (s_w[t] - (par.e_w - 1) / par.e_w) + par.beta_mean * Pi_w_plus
+
 def union(par, ini, ss, tau, w, UCE_hh, s_w, N, Pi_w, Pi):
     Pi_lag = lag(ini.Pi, Pi)
 
@@ -192,7 +180,7 @@ def real_wage(par, ini, ss, w, Pi_w, Pi, w_res):
 
 @nb.jit
 def market_clearing(par, ini, ss, Y, L_hh, C_hh, G, eg_transfer, I, psi, q, B, p_eq, A_hh, qB, A, L, clearing_Y,
-                    clearing_A, clearing_L):
+                    clearing_A, clearing_L, clearing_wealth):
     # Y
     L[:] = L_hh
     L_lag = lag(ini.L, L)
@@ -206,5 +194,26 @@ def market_clearing(par, ini, ss, Y, L_hh, C_hh, G, eg_transfer, I, psi, q, B, p
     # L
     clearing_L[:] = L_hh - L
 
-    # clearing_wealth =
+    clearing_wealth[:] = p_eq + qB - (L_hh + A_hh)
+
+@nb.jit
+def market_clearing_B_shock(par, ini, ss, L_hh, A_hh, rl, qB, q, B, clearing_Y, Y, ra, C_hh, p_eq, tau,
+                            Div, I, psi, L, clearing_A, A, clearing_L):
+
+    # Y
+    L[:] = L_hh
+    L_lag = lag(ini.L, L)
+    A_hh_lag = lag(ini.A, A_hh)
+    rl_lag = lag(ini.rl, rl)
+    qB[:] = q * B
+    clearing_Y[:] = Y - ((1 + rl_lag) * L_lag + (1 + ra) * A_hh_lag - C_hh - p_eq - qB) / (1 - tau) + (Div + I + psi)
+
+
+    # A
+    A[:] = p_eq + qB - L
+    clearing_A[:] = A_hh - A
+
+    # L
+    clearing_L[:] = L_hh - L
+
 

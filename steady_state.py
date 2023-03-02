@@ -108,11 +108,11 @@ def evaluate_ss(model, do_print=False):
     ss.N = 1.0  # normalization
 
     ss.r = par.r_ss_target
-    ss.L = par.L_Y_ratio * ss.Y
     ss.K = par.K_Y_ratio * ss.Y # ss.Kd =
     ss.G = par.G_Y_ratio * ss.Y
     ss.qB = par.qB_Y_ratio * ss.Y
     ss.A = par.A_Y_ratio * ss.Y
+    ss.L = par.L_Y_ratio * ss.Y
 
     par.mu_p = ss.Y / (ss.Y - ss.r * (ss.A + ss.L - ss.qB - ss.K))
     par.e_p = par.mu_p / (par.mu_p - 1)
@@ -188,6 +188,8 @@ def evaluate_ss(model, do_print=False):
     ss.clearing_A = ss.A_hh - ss.A
 
     ss.clearing_L = ss.L_hh - ss.L
+
+    ss.clearing_wealth = ss.p_eq + ss.qB - (ss.L_hh + ss.A_hh)
 
 
 

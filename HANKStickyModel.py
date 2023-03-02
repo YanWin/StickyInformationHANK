@@ -51,6 +51,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         # d. all variables
         self.varlist = [
+            # 'A_L_ratio',
             'A',
             'B',
             'clearing_A',
@@ -127,6 +128,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
         par.A_target = np.nan
         par.Y_target = 1.0
+        # par.A_L_ratio = 0.9
 
         # a. preferences
         par.sigma = 1.0  # CRRA coefficient
