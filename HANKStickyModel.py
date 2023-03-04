@@ -26,7 +26,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         # b. household
         self.grids_hh = ['l','a']  # grids
         self.pols_hh = ['l','a']  # policy functions
-        self.inputs_hh = ['Z','ra','rl','eg_transfer']  # direct inputs
+        self.inputs_hh = ['tau','wN','ra','rl','eg_transfer'] # ['tau','wN','ra','rl','eg_transfer']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
         self.outputs_hh = ['c','l','a','uce']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
@@ -51,13 +51,11 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         # d. all variables
         self.varlist = [
-            # 'A_L_ratio',
             'A',
             'B',
             'clearing_A',
             'clearing_MPC',
             'clearing_L',
-            # 'clearing_K',
             'clearing_wealth',
             'clearing_Y',
             'Div_int',
@@ -67,9 +65,6 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'eG',
             'etau',
             'eg',
-            # 'eg_direct',
-            # 'eg_distribution',
-            # 'eg_debt',
             'eg_transfer',
             'em',
             'fisher_res',
@@ -97,6 +92,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'tau',
             'w_res',
             'w',
+            'wN',
             'Y',
             'Z'
             ]

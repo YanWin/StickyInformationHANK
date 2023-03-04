@@ -7,12 +7,14 @@ from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
 @nb.njit
-def solve_hh_backwards(par,z_trans,Z,ra,rl,eg_transfer,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
+def solve_hh_backwards(par,z_trans,tau,wN,ra,rl,eg_transfer,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
     A_target = par.A_target
     ra_ss = par.r_ss_target
+
+    Z = (1 - tau) * wN
 
     # solve
     for i_fix in range(par.Nfix):

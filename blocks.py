@@ -5,7 +5,7 @@ from GEModelTools import lag, lead, prev, next
 
 
 @nb.njit
-def production_firm(par, ini, ss, Y, Ip, I, K, N, s, w, rk, psi,
+def production_firm(par, ini, ss, Y, Ip, I, K, N, s, w, wN, rk, psi,
                     Div, Div_k, Div_int, Q, r):
 
     Ip_lag = lag(ini.Ip, Ip)
@@ -16,6 +16,7 @@ def production_firm(par, ini, ss, Y, Ip, I, K, N, s, w, rk, psi,
         K[t] = (1 - par.delta_K) * K_lag + I[t]
 
     N[:] = (Y / (par.Theta * K ** par.alpha)) ** (1 / (1 - par.alpha))
+    wN[:] = w * N
     s[:] = w * N / Y / (1 - par.alpha)
     rk[:] = s * par.alpha * par.Theta * K ** (par.alpha - 1) * N ** (1 - par.alpha)
 

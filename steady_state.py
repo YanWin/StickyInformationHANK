@@ -142,6 +142,7 @@ def evaluate_ss(model, do_print=False):
     par.alpha = ss.rk * ss.K / ss.s
     par.Theta = ss.Y * ss.K ** (-par.alpha) * ss.N ** (par.alpha - 1)
     ss.w = ss.s * (1 - par.alpha) / ss.N
+    ss.wN = ss.w * ss.N
     ss.Div_int = (1 - ss.s) * ss.Y
 
     # e. capital firms
