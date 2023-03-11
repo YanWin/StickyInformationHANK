@@ -108,7 +108,8 @@ def evaluate_ss(model, do_print=False):
     ss.N = 1.0  # normalization
 
     ss.r = par.r_ss_target
-    ss.K = par.K_Y_ratio * ss.Y # ss.Kd =
+    # ss.K = par.K_Y_ratio * ss.Y
+    ss.Kd = ss.K = par.K_Y_ratio * ss.Y
     ss.G = par.G_Y_ratio * ss.Y
     ss.qB = par.qB_Y_ratio * ss.Y
     ss.A = par.A_Y_ratio * ss.Y
@@ -118,10 +119,11 @@ def evaluate_ss(model, do_print=False):
     par.e_p = par.mu_p / (par.mu_p - 1)
     par.e_w = par.e_p
 
-    par.kappa_w = (1 - par.xi_w) * (1 - par.xi_w * par.beta_mean) / par.xi_w \
-                  * par.e_w / (par.v_w + par.e_w - 1)
-    model.par.kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + ss.r)) / par.xi_p \
-                    * par.e_p / (par.v_p + par.e_p - 1)
+
+    # par.kappa_w = (1 - par.xi_w) * (1 - par.xi_w * par.beta_w) / par.xi_w \
+    #               * par.e_w / (par.v_w + par.e_w - 1)
+    # par.kappa = (1 - par.xi_p) * (1 - par.xi_p / (1 + ss.r)) / par.xi_p \
+    #                 * par.e_p / (par.v_p + par.e_p - 1)
 
     # zero inflation
     ss.Pi = 0.0
@@ -168,12 +170,6 @@ def evaluate_ss(model, do_print=False):
     ss.eg = 0.0
     ss.em = 0.0
     ss.eg_transfer = 0.0
-    ss.eG = 0.0
-    ss.etau = 0.0
-    ss.eB = 0.0
-    # ss.eg_debt = 0.0
-    # ss.eg_direct = 0.0
-    # ss.eg_distribution = 0.0
 
     model.solve_hh_ss()
     model.simulate_hh_ss()
@@ -218,6 +214,19 @@ def objective_ss(x, model, do_print=False):
     return ss.clearing_Y, ss.clearing_MPC
 
 
+# def constrainedFunction(x, f,  model, do_print, lower, upper,  minIncr=0.00000000001):
+#     x = np.asarray(x)
+#     lower = np.asarray(lower)
+#     upper = np.asarray(upper)
+#     xBorder = np.where(x < lower, lower, x)
+#     xBorder = np.where(x > upper, upper, xBorder)
+#     fBorder = np.array(f(xBorder, model, do_print=do_print))
+#     distFromBorder = (np.sum(np.where(x < lower, lower - x, 0.))
+#                       + np.sum(np.where(x > upper, x - upper, 0.)))
+#     return (fBorder + (fBorder
+#                        + np.where(fBorder > 0, minIncr, -minIncr)) * distFromBorder)
+
+
 def find_ss(model, do_print=False):
     """ find the steady state """
 
@@ -228,8 +237,12 @@ def find_ss(model, do_print=False):
     if do_print: print('find beta for market clearing')
 
     t0 = time.time()
-    # res = optimize.root(objective_ss, par.beta_mean, method='hybr', tol=par.tol_ss, args=(model, do_print))
-    res = optimize.root(objective_ss, np.array([par.beta_mean, par.sigma_e]), method='hybr', tol=par.tol_ss, args=(model, do_print))
+    # lower = np.asarray([0.99,0.2])
+    # upper = np.asarray([0.9995,0.65])
+    # res = optimize.root(constrainedFunction, x0=np.array([par.beta_mean, par.sigma_e]), method='hybr', tol=par.tol_ss,
+    #                     args=(objective_ss, model, do_print, lower, upper))
+
+    res = optimize.root(objective_ss, np.array([par.beta_mean, par.sigma_e]), method='hybr', tol=par.tol_ss, args=(model, do_print))    # method='hybr'
 
     # b. final evaluation
     if do_print: print('\nfinal evaluation')

@@ -33,18 +33,20 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         # c. GE
         # self.shocks = ['eg','em','eg_transfer']  # exogenous shocks
-        self.shocks = ['eg','em','eg_transfer','eB','eG','etau']  # exogenous shocks
-        self.unknowns = ['r','w','Y','Ip']  # endogenous unknowns
-        self.targets = ['fisher_res','w_res','clearing_Y','invest_res']  # targets = 0
+        self.shocks = ['eg','em','eg_transfer']  # exogenous shocks
+        self.unknowns = ['r','w','rk','Y','Ip','Pi','Pi_w']  # endogenous unknowns
+        self.targets = ['fisher_res','w_res','clearing_Y','invest_res','NKPC_res','NKPC_w_res','clearing_K']  # targets = 0
+        # self.unknowns = ['r','w','Y','Ip']  # endogenous unknowns
+        # self.targets = ['fisher_res','w_res','clearing_Y','invest_res']  # targets = 0
         self.blocks = [
             'blocks.production_firm',
-            'blocks.price_setters',
+            'blocks.capital_firm',
+            'blocks.price_setters_no_indexation',
             'blocks.mutual_fund',
             'blocks.government',
             'hh',
-            'blocks.union',
+            'blocks.union_no_indexation',
             'blocks.taylor',
-            'blocks.invest_residual',
             'blocks.fisher',
             'blocks.real_wage',
             'blocks.market_clearing']
@@ -58,12 +60,10 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'clearing_L',
             'clearing_wealth',
             'clearing_Y',
+            'clearing_K',
             'Div_int',
             'Div_k',
             'Div',
-            'eB',
-            'eG',
-            'etau',
             'eg',
             'eg_transfer',
             'em',
@@ -74,8 +74,11 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             'invest_res',
             'Ip',
             'K',
+            'Kd',
             'L',
             'N',
+            'NKPC_res',
+            'NKPC_w_res',
             'p_eq',
             'Pi_w',
             'Pi',
@@ -114,16 +117,21 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
 
         par.MPC_target = 0.525
         par.K_Y_ratio = 2.23*4  # capital to GDP  - quarterly
+        par.Y_target = 1.0
+
+        # par.hh_wealth_Y_ratio = 3.82 * 4  # aggregate household wealth - quarterly
+        # par.L_A_ratio = 0.23/(3.82-0.23)
+        # par.A_Y_ratio = par.hh_wealth_Y_ratio / (par.L_A_ratio + 1)
+        # par.L_Y_ratio = par.hh_wealth_Y_ratio - par.A_Y_ratio
         par.L_Y_ratio = 0.23*4  # liquid assets to GDP - quarterly
-        # par.L_Y_ratio = np.nan
         par.hh_wealth_Y_ratio = 3.82*4  # aggregate household wealth - quarterly
-        # par.A_L_ratio = 0.85
+        par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
+
         par.G_Y_ratio = 0.16  # spending-to-GDP
         par.G_ss = np.nan
         par.qB_Y_ratio = 0.42*4  # government bonds to GDP - quarterly
-        par.A_Y_ratio = (par.hh_wealth_Y_ratio - par.L_Y_ratio)
         par.A_target = np.nan
-        par.Y_target = 1.0
+
         # par.A_L_ratio = 0.9
 
         # a. preferences
@@ -147,23 +155,24 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.e_p = np.nan
         par.xi_p = 0.926  # calvo price stickiness
         par.v_p = 0.0 #  # Kimball superelasticity for prices
-        par.kappa = np.nan
+        par.kappa = 0.03
 
         # d. capital goods firms
-        par.phi_K = 9.0  # 3.0 (inverse of the) elasticity of investment
+        par.phi_K = 5.74  # 3.0 (inverse of the) elasticity of investment
 
         # e. unions
         par.e_w = np.nan
         par.xi_w = 0.899 #0.899  # calvo wage stickiness
         par.v_w = 0.0 # *2  # Kimball superelasticity for wages
-        par.kappa_w = np.nan
+        par.kappa_w = 0.03
+        par.beta_w = 0.988
 
         # f. central bank
         par.rho_m = 0.89  # Taylor rule intertia    # TODO: estimate?
         par.phi_pi = 1.25  # Taylor rule coefficient # TODO: estimate?
 
         # g. government
-        par.phi_tau = 0.1 # response of tax rate to debt # TODO: calibrate (at least sensitivity analysis)
+        par.phi_tau = 0.1/4 # response of tax rate to debt # TODO: calibrate (at least sensitivity analysis)
         par.phi_G = 0.5 # deficit financing of government expenditure shock
         maturity = 5*4 # Maturity of government debt
         par.delta_q = (maturity-1)*(1+par.r_ss_target)/maturity
@@ -195,25 +204,6 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.jump_eg_transfer = 0.0  # initial jump
         par.rho_eg_transfer = 0.0  # AR(1) coefficient
         par.std_eg_transfer = 0.0  # std. of innovation
-
-        #
-        par.jump_eG = par.jump_etau = par.jump_eB = 0.0
-        par.rho_eG = par.rho_etau = par.rho_eB = 0.0
-        par.std_eG = par.std_etau = par.std_eB = 0.0
-        # # 4a. direct effect
-        # par.jump_eg_direct = par.jump_eg  # initial jump
-        # par.rho_eg_direct = par.rho_eg  # AR(1) coefficient
-        # par.std_eg_direct = par.std_eg  # std. of innovation
-        # # 4b. distributional effect
-        # par.jump_eg_distribution = par.jump_eg  # initial jump
-        # par.rho_eg_distribution = par.rho_eg  # AR(1) coefficient
-        # par.std_eg_distribution = par.std_eg  # std. of innovation
-        # # 4c. crowding out effect
-        # par.jump_eg_debt = par.jump_eg  # initial jump
-        # par.rho_eg_debt = par.rho_eg  # AR(1) coefficient
-        # par.std_eg_debt = par.std_eg  # std. of innovation
-
-
 
         # k. misc.
         par.T = 400  # length of transition path

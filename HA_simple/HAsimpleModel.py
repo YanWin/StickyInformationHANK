@@ -65,7 +65,8 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
         xi_p_a = 0.065  # intermediation spread (p.a.)
         par.xi = 1 + par.r_ss_target - (1 + r_ss_target_p_a - xi_p_a) ** (1 / 4)  # quarterly
 
-        par.Z_target = 0.53
+        d_a = par.r_ss_target * 14.36 # steady state distribution from illiquid asset
+        par.Z_target = 0.53 + d_a
         # MPCs_data = [0.525, 0.175, 0.10, 0.045, 0.03, 0.025]
         par.MPC_target = 0.525
 
