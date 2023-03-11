@@ -93,6 +93,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
             's_w',
             's',
             'tau',
+            'T',
             'w_res',
             'w',
             'wN',

@@ -127,26 +127,28 @@ def mutual_fund(par,ini,ss,Div_k,Div_int,r,Div,q,p_eq,rl,ra):
     ra[1:] = r[:-1]
 
 @nb.njit
-def government(par,ini,ss,eg,eg_transfer,w,N,q,G,tau,B,Z):
+def government(par,ini,ss,eg,eg_transfer,w,N,q,G,T,tau,B,Z):
 
-    G[:] = ss.G * (1 + eg) + eg_transfer
+    G[:] = ss.G * (1 + eg)
+    T[:] = eg_transfer
     for t in range(par.T):
 
         B_lag = prev(B,t,ini.B)
 
         tau_no_shock = ss.tau + par.phi_tau*ss.q*(B_lag-ss.B)/ss.Y
-        delta_tau = (1-par.phi_G)*(G[t] - ss.G)/(w[t]*N[t])
+        delta_tau = (1-par.phi_G)*(G[t] - ss.G + T[t])/(w[t]*N[t])
         
         tau[t] = tau_no_shock + delta_tau
-        B[t] = ((1+par.delta_q*q[t])*B_lag+G[t]-tau[t]*w[t]*N[t])/q[t]
+        B[t] = ((1+par.delta_q*q[t])*B_lag+G[t]+T[t]-tau[t]*w[t]*N[t])/q[t]
 
     Z[:] = (1 - tau) * w * N
 
-def government_constant_B(par, ini, ss, eg, eg_transfer, w, N, q, G, tau, B, Z):
+def government_constant_B(par, ini, ss, eg, eg_transfer, w, N, q, G, T, tau, B, Z):
 
-    G[:] = ss.G * (1 + eg) + eg_transfer
+    G[:] = ss.G * (1 + eg)
+    T[:] = eg_transfer
     B[:] = ss.B
-    tau[:] = (G + (1 + par.delta_q * q) * ss.B - q * ss.B) / (w * N)
+    tau[:] = (G + T + (1 + par.delta_q * q) * ss.B - q * ss.B) / (w * N)
     Z[:] = (1 - tau) * w * N
 
 # @nb.njit
@@ -217,12 +219,12 @@ def real_wage(par,ini,ss,w,Pi_w,Pi,w_res):
 
 
 @nb.jit
-def market_clearing(par,ini,ss,Y,L_hh,C_hh,G,eg_transfer,I,psi,Kd,K,q,B,p_eq,A_hh,qB,A,L,clearing_Y,clearing_K,clearing_A,clearing_L):
+def market_clearing(par,ini,ss,Y,L_hh,C_hh,G,I,psi,Kd,K,q,B,p_eq,A_hh,qB,A,L,clearing_Y,clearing_K,clearing_A,clearing_L):
 
     # Y
     L[:] = L_hh
     L_lag = lag(ini.L, L)
-    clearing_Y[:] = Y - (C_hh + (G - eg_transfer)  + I + psi + par.xi*L_lag)
+    clearing_Y[:] = Y - (C_hh + G  + I + psi + par.xi*L_lag)
     
     # K
     clearing_K[:] = Kd-K
