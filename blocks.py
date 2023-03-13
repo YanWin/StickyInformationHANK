@@ -143,6 +143,29 @@ def government(par,ini,ss,eg,eg_transfer,w,N,q,G,T,tau,B,Z):
 
     Z[:] = (1 - tau) * w * N
 
+
+@nb.njit
+def government_constant_tax(par, ini, ss, eg, eg_transfer, w, N, q, G, T, tau, B, Z):
+    G[:] = ss.G * (1 + eg)
+    T[:] = eg_transfer
+    for t in range(par.T):
+        B_lag = prev(B, t, ini.B)
+
+        if t < 40:
+            tau[t] = ss.tau
+            B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] + T[t] - tau[t] * w[t] * N[t]) / q[t]
+        elif t < 48:
+            tau[t] = ss.tau + (t - 39) / 8 * par.phi_tau * ss.q * (B[39] - ss.B) / ss.Y
+            B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] + T[t] - tau[t] * w[t] * N[t]) / q[t]
+        elif t < 56:
+            tau[t] = tau[47]
+            B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] + T[t] - tau[t] * w[t] * N[t]) / q[t]
+        else:
+            tau[t] = ss.tau + 2 * par.phi_tau * ss.q * (B_lag - ss.B) / ss.Y
+            B[t] = ((1 + par.delta_q * q[t]) * B_lag + G[t] + T[t] - tau[t] * w[t] * N[t]) / q[t]
+
+    Z[:] = (1 - tau) * w * N
+
 def government_constant_B(par, ini, ss, eg, eg_transfer, w, N, q, G, T, tau, B, Z):
 
     G[:] = ss.G * (1 + eg)

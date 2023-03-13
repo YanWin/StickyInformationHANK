@@ -173,7 +173,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         par.phi_pi = 1.25  # Taylor rule coefficient # TODO: estimate?
 
         # g. government
-        par.phi_tau = 0.1/4 # response of tax rate to debt # TODO: calibrate (at least sensitivity analysis)
+        par.phi_tau = 0.1 # 0.1/4 # response of tax rate to debt # TODO: calibrate (at least sensitivity analysis)
         par.phi_G = 0.5 # deficit financing of government expenditure shock
         maturity = 5*4 # Maturity of government debt
         par.delta_q = (maturity-1)*(1+par.r_ss_target)/maturity
