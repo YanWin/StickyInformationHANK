@@ -81,7 +81,9 @@ class HAsimpleModelClass(EconModelClass, GEModelClass):
 
         # b. income and saving parameters
         par.rho_e = 0.966  # AR(1) parameter
-        par.sigma_e = 0.5  # 0.5 std. of e
+        par.sigma_e = 0.36  # 0.5 std. of e
+
+        par.L_target = 0.23*4
 
 
         # i. grids
