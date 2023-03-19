@@ -58,7 +58,31 @@ def capital_firm(par,ini,ss,r,rk,Ip,Q,invest_res,I,K,psi,Div_k):
     psi[:] = I*S
     Div_k[:] = rk*K-I-psi
 
+@nb.njit
+def capital_firm_constant_I(par,ini,ss,r,rk,Ip,Q,invest_res,I,K,psi,Div_k):
+    for k in range(par.T):
+        t = par.T - 1 - k
 
+        Q_plus = next(Q, t, ss.Q)
+        rk_plus = next(rk, t, ss.rk)
+        r_plus = next(r, t, ss.r)
+        rk_plus2 = next(rk, t + 1, ss.rk)
+
+        Q[t] = (rk_plus2 + (1 - par.delta_K) * Q_plus) / (1 + r_plus)
+        # Q[t] = (rk_plus+(1-par.delta_K)*Q_plus)/(1+r[t])
+
+    # accumulate capital
+    Ip[:] = ss.I
+    I[:] = ss.I
+    for t in range(par.T):
+        K_lag = prev(K, t, ini.K)
+        K[t] = (1 - par.delta_K) * K_lag + I[t]
+
+    # dividends
+    I_lag = lag(ini.I, I)
+    S = par.phi_K / 2 * (I / I_lag - 1.0) ** 2
+    psi[:] = I * S
+    Div_k[:] = rk * K - I - psi
 
 @nb.njit
 def price_setters(par,ini,ss,s,Pi,Y,NKPC_res,Div_int):

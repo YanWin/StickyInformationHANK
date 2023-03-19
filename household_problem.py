@@ -7,7 +7,7 @@ from consav.linear_interp import interp_1d_vec
 from consav.linear_interp import interp_1d
 
 @nb.njit
-def solve_hh_backwards(par,z_trans,tau,wN,ra,rl,eg_transfer,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce):
+def solve_hh_backwards(par,z_trans,tau,wN,ra,rl,eg_transfer,vbeg_l_a_plus,vbeg_l_a,l,c,a,uce,u):
     """ solve backwards with vbeg_l_a from previous iteration """
 
     # unpack
@@ -50,6 +50,8 @@ def solve_hh_backwards(par,z_trans,tau,wN,ra,rl,eg_transfer,vbeg_l_a_plus,vbeg_l
                     assert not a[i_fix,i_z,i_l,i_a] < 0, 'negative illiquid assets'
 
                     uce[i_fix,i_z,i_l,i_a] = e*c[i_fix,i_z,i_l,i_a]**(-par.sigma) # productivity weighted marg. util.
+
+                    u[i_fix,i_z,i_l,i_a] = np.log(c[i_fix,i_z,i_l,i_a])
 
         # b. expectation step
         v_l_a = (1+rl)*c[i_fix]**(-par.sigma)

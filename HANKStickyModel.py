@@ -28,7 +28,7 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         self.pols_hh = ['l','a']  # policy functions
         self.inputs_hh = ['tau','wN','ra','rl','eg_transfer'] # ['tau','wN','ra','rl','eg_transfer']  # direct inputs
         self.inputs_hh_z = []  # transition matrix inputs
-        self.outputs_hh = ['c','l','a','uce']  # outputs
+        self.outputs_hh = ['c','l','a','uce','u']  # outputs
         self.intertemps_hh = ['vbeg_l_a']  # intertemporal variables
 
         # c. GE
