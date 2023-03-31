@@ -246,11 +246,13 @@ def taylor_constant_r(par,ini,ss,em,Pi,i):
     Pi_plus = lead(Pi, ss.Pi)
     i[:] = ss.r + Pi_plus + em
 
-@nb.njit
-def fisher2(par,ini,ss,Pi,i,r,fisher_res):
-
-    Pi_plus = lead(Pi,ss.Pi)
-    fisher_res[:] = i-r-Pi_plus
+def taylor_hgdrn(par,ini,ss,em,Pi,i,Y):
+    xi = 1 / (1 + ss.r)
+    for t in range(par.T-1):
+        Pi_lag = prev(Pi, t, ini.Pi)
+        Y_lag = prev(Y, t, ini.Y)
+        i_lag = prev(i, t, ini.i)
+        i[t] = (1/ xi) * (1 + Pi_lag) ** (0.5 * (1 - 0.8)) * (Y_lag/ss.Y) ** (0.25 * (1 - 0.8)) * (xi * (1 + i_lag)) ** 0.8 - 1
 
 @nb.njit
 def fisher(par,ini,ss,Pi,i,r,fisher_res):

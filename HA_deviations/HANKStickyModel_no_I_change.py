@@ -34,10 +34,10 @@ class HANKStickyModelClass(EconModelClass, HANKStickyAnalyticsClass):
         # c. GE
         # self.shocks = ['eg','em','eg_transfer']  # exogenous shocks
         self.shocks = ['eg','em','eg_transfer']  # exogenous shocks
-        self.unknowns = ['r','w','rk','Y','Pi','Pi_w']  # endogenous unknowns
-        self.targets = ['fisher_res','w_res','clearing_Y','NKPC_res','NKPC_w_res','clearing_K']  # targets = 0
-        # self.unknowns = ['r','w','Y','Ip']  # endogenous unknowns
-        # self.targets = ['fisher_res','w_res','clearing_Y','invest_res']  # targets = 0
+        # self.unknowns = ['r','w','rk','Y','Pi','Pi_w']  # endogenous unknowns
+        # self.targets = ['fisher_res','w_res','clearing_Y','NKPC_res','NKPC_w_res','clearing_K']  # targets = 0
+        self.unknowns = ['r','w','Y']  # endogenous unknowns
+        self.targets = ['fisher_res','w_res','clearing_Y']  # targets = 0
         self.blocks = [
             'blocks.production_firm',
             'blocks.capital_firm_constant_I',
